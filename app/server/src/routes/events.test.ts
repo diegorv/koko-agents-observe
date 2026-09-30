@@ -440,3 +440,88 @@ describe('POST /api/events — dedup', () => {
     expect(events).toHaveLength(1)
   })
 })
+
+describe('POST /api/events — background poll ticks', () => {
+  // Claude Code fires a SubagentStop ~every 31s while background work is in
+  // flight, each with a throwaway agent_id that belongs to no real subagent.
+  // They collapse onto one lane per session instead of one agent row apiece.
+  function tick(agentId: string, timestamp: number, payload: Record<string, unknown> = {}) {
+    return {
+      agentClass: 'claude-code',
+      sessionId: 'sess-1',
+      agentId,
+      hookName: 'SubagentStop',
+      timestamp,
+      payload: { hook_event_name: 'SubagentStop', agent_type: '', ...payload },
+    }
+  }
+
+  test('collapses many ticks onto one background lane, creating no per-tick agents', async () => {
+    await postEvent(tick('af0cb6cac2ed003b3', 1000, { last_assistant_message: 'one' }))
+    await postEvent(tick('a5a8bdf11072b8ac2', 32000, { last_assistant_message: 'two' }))
+    await postEvent(tick('a264b2f3888eeb0a8', 63000, { last_assistant_message: 'three' }))
+
+    expect(await store.getAgentById('af0cb6cac2ed003b3')).toBeNull()
+    expect(await store.getAgentById('a5a8bdf11072b8ac2')).toBeNull()
+    expect(await store.getAgentById('a264b2f3888eeb0a8')).toBeNull()
+
+    const lane = await store.getAgentById('sess-1:background')
+    expect(lane).not.toBeNull()
+
+    const events = await store.getEventsForSession('sess-1')
+    expect(events).toHaveLength(3)
+    for (const e of events) expect(e.agent_id).toBe('sess-1:background')
+  })
+
+  test('preserves the original agent_id inside the stored payload', async () => {
+    await postEvent(tick('af0cb6cac2ed003b3', 1000))
+    const events = await store.getEventsForSession('sess-1')
+    const payload = JSON.parse(events[0].payload)
+    expect(payload.agent_id).toBeUndefined() // not present on this fixture
+    expect(events[0].agent_id).toBe('sess-1:background')
+  })
+
+  test('a typed SubagentStop still lands on its own real agent', async () => {
+    await postEvent(tick('a356a5359c2963201', 1000, { agent_type: 'general-purpose' }))
+
+    const agent = await store.getAgentById('a356a5359c2963201')
+    expect(agent).not.toBeNull()
+    expect(await store.getAgentById('sess-1:background')).toBeNull()
+
+    const events = await store.getEventsForSession('sess-1')
+    expect(events[0].agent_id).toBe('a356a5359c2963201')
+  })
+
+  test('an id already opened by SubagentStart is never rerouted', async () => {
+    await postEvent({
+      agentClass: 'claude-code',
+      sessionId: 'sess-1',
+      agentId: 'a356a5359c2963201',
+      hookName: 'SubagentStart',
+      timestamp: 1000,
+      payload: { hook_event_name: 'SubagentStart' },
+    })
+    // Stop arrives with an empty agent_type, but the agents row already exists.
+    await postEvent(tick('a356a5359c2963201', 5000))
+
+    expect(await store.getAgentById('sess-1:background')).toBeNull()
+    const events = await store.getEventsForSession('sess-1')
+    expect(events).toHaveLength(2)
+    for (const e of events) expect(e.agent_id).toBe('a356a5359c2963201')
+  })
+
+  test('lanes are per-session', async () => {
+    await postEvent(tick('af0cb6cac2ed003b3', 1000))
+    await postEvent({ ...tick('a5a8bdf11072b8ac2', 1000), sessionId: 'sess-2' })
+
+    expect(await store.getAgentById('sess-1:background')).not.toBeNull()
+    expect(await store.getAgentById('sess-2:background')).not.toBeNull()
+  })
+
+  test('broadcasts the tick under the lane id so the client lands it in one row', async () => {
+    await postEvent(tick('af0cb6cac2ed003b3', 1000))
+    const broadcast = sessionBroadcasts.find((b) => b.sessionId === 'sess-1')
+    expect(broadcast).toBeDefined()
+    expect(broadcast!.msg.data.agentId).toBe('sess-1:background')
+  })
+})

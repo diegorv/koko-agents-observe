@@ -136,7 +136,10 @@ export interface EventStore {
   clearSessionEvents(sessionId: string): Promise<{ events: number; agents: number }>
   getDbStats(): Promise<{ sessionCount: number; eventCount: number }>
   vacuum(): Promise<void>
-  getRecentSessions(limit?: number): Promise<any[]>
+  /** Recent sessions, newest activity first. When `since` (epoch ms) is
+   *  given, only sessions whose last activity is at or after it are returned
+   *  — used by the Constellation dashboard's activity-window filter. */
+  getRecentSessions(limit?: number, since?: number): Promise<any[]>
   /** Sessions where project_id IS NULL — surfaced in the sidebar's
    *  "Unassigned" bucket. Server doesn't auto-assign post-refactor
    *  unless `flags.resolveProject` or `_meta.project.slug` is set, so

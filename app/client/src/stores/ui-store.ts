@@ -3,9 +3,69 @@ import type { Label } from '@/types'
 import type { EnrichedEvent } from '@/agents/types'
 import type { TimeRange } from '@/config/time-ranges'
 import { getServerHealth } from '@/lib/server-health'
+import { ACTIVITY_CONFIG } from '@/config/activity'
 
-// Session IDs are UUIDs (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+// URL hash grammar (positional, never pattern-based):
+//   #/                      → home
+//   #/<proj>                → project view
+//   #/<proj>/<sess>         → session in a project
+//   #/_/<sess>              → session whose project is unknown/unassigned
+//   …with an optional `:<view>` deep-link suffix.
+// Segment 0 is always the project, segment 1 (if present) the session — no
+// UUID/shape sniffing, so any agent's id format works. Every segment is
+// percent-encoded on write and decoded on read, so slugs/ids may contain any
+// character except a raw '/' (the structural separators '/', ':', '@' only
+// ever appear encoded inside a segment). `_` is the reserved placeholder for
+// "project unknown"; it's safe because the session id is the source of truth
+// (sessions.id is unique) and useRouteSync rewrites the segment from the
+// resolved project. NB: encodeURIComponent('_') === '_', so a project whose
+// slug were literally '_' could not be distinguished — server slugs never are.
+export const PROJECT_PLACEHOLDER = '_'
+
+// decodeURIComponent throws on malformed input (a stray '%'); fall back to the
+// raw segment so a hand-mangled URL degrades instead of crashing the router.
+function safeDecode(s: string): string {
+  try {
+    return decodeURIComponent(s)
+  } catch {
+    return s
+  }
+}
+
+// The view sub-grammar is `scope.name[@target]`; '.' and '@' are structural and
+// the scope/name are a controlled vocabulary, so only the @target id (a session
+// id) can carry arbitrary characters — encode/decode just that part.
+function encodeViewTarget(view: string): string {
+  const at = view.indexOf('@')
+  return at === -1 ? view : view.slice(0, at + 1) + encodeURIComponent(view.slice(at + 1))
+}
+function decodeViewTarget(view: string): string {
+  const at = view.indexOf('@')
+  return at === -1 ? view : view.slice(0, at + 1) + safeDecode(view.slice(at + 1))
+}
+
+/**
+ * Build the canonical `#/…` hash for a (project, session, view) triple.
+ * Single source of truth for hash construction — used by updateHash, the
+ * history seeding on load, useRouteSync's canonicalization, and the
+ * session-link anchors. A null project with a session yields the `_`
+ * placeholder.
+ */
+export function buildHash(
+  projectSlug: string | null,
+  sessionId: string | null,
+  view: string | null,
+): string {
+  let path = '/'
+  if (sessionId) {
+    const proj = projectSlug ? encodeURIComponent(projectSlug) : PROJECT_PLACEHOLDER
+    path = `/${proj}/${encodeURIComponent(sessionId)}`
+  } else if (projectSlug) {
+    path = `/${encodeURIComponent(projectSlug)}`
+  }
+  const suffix = view ? `:${encodeViewTarget(view)}` : ''
+  return `#${path}${suffix}`
+}
 
 /**
  * Parses the deep-link view string (the part after `:` in the hash).
@@ -50,20 +110,27 @@ function parseHash(): {
   // Strip the trailing :view suffix (only one `:` per URL by convention).
   let view: string | null = null
   let path = hash
+  // The only raw ':' in the hash is the view delimiter — any ':' inside a slug
+  // (e.g. `branch:prefix:agent`) is percent-encoded as %3A, so this is safe.
   const colonIdx = hash.indexOf(':')
   if (colonIdx !== -1) {
-    view = hash.slice(colonIdx + 1) || null
+    const rawView = hash.slice(colonIdx + 1)
+    view = rawView ? decodeViewTarget(rawView) : null
     path = hash.slice(0, colonIdx)
   }
 
   if (!path || path === '/') return { projectSlug: null, sessionId: null, view }
-  const parts = path.split('/').filter(Boolean)
+  const parts = path.split('/').filter(Boolean).map(safeDecode)
   if (parts.length === 1) {
-    if (UUID_RE.test(parts[0])) return { projectSlug: null, sessionId: parts[0], view }
+    // A bare placeholder (`#/_`) is meaningless — only the project slot of a
+    // session URL uses it — so treat it as home.
+    if (parts[0] === PROJECT_PLACEHOLDER) return { projectSlug: null, sessionId: null, view }
     return { projectSlug: parts[0], sessionId: null, view }
   }
-  if (parts.length >= 2) return { projectSlug: parts[0], sessionId: parts[1], view }
-  return { projectSlug: null, sessionId: null, view }
+  // 2+ segments: [project-or-placeholder, session]. The placeholder resolves
+  // to a null project that useRouteSync fills in from the session.
+  const projectSlug = parts[0] === PROJECT_PLACEHOLDER ? null : parts[0]
+  return { projectSlug, sessionId: parts[1], view }
 }
 
 // When true, skip pushState (the URL is already correct from browser navigation)
@@ -71,20 +138,13 @@ let suppressHashPush = false
 
 function updateHash(projectSlug: string | null, sessionId: string | null, view: string | null) {
   if (suppressHashPush) return
-  let hash = '/'
-  if (projectSlug && sessionId) {
-    hash = `/${projectSlug}/${sessionId}`
-  } else if (projectSlug) {
-    hash = `/${projectSlug}`
-  } else if (sessionId) {
-    hash = `/${sessionId}`
-  }
-  if (view) hash += `:${view}`
-  const fullHash = `#${hash}`
   // No-op guard: opening the same modal twice (or re-pushing the same URL
-  // during a redundant set) would otherwise pollute the history stack.
-  if (window.location.hash === fullHash) return
-  window.history.pushState(null, '', fullHash)
+  // during a redundant set) would otherwise pollute the history stack. Compare
+  // the parsed logical triple rather than raw strings — segments are encoded,
+  // and the browser may normalize the stored hash differently than buildHash.
+  const cur = parseHash()
+  if (cur.projectSlug === projectSlug && cur.sessionId === sessionId && cur.view === view) return
+  window.history.pushState(null, '', buildHash(projectSlug, sessionId, view))
 }
 
 interface SessionFilterState {
@@ -111,6 +171,25 @@ interface UIState {
   selectedAgentIds: string[]
   setSelectedProject: (id: number | null, slug?: string | null) => void
   setSelectedSessionId: (id: string | null) => void
+  /**
+   * Navigate straight to a session from a non-project context (home /
+   * constellation / pinned) as a SINGLE history entry. Setting the project
+   * and session separately pushes two entries (`#/slug` then `#/slug/id`),
+   * which strands the browser Back button on an intermediate project page;
+   * this sets both at once with one `updateHash`.
+   */
+  openSession: (projectId: number | null, slug: string | null, sessionId: string) => void
+
+  // Preview selection — highlights a session (and expands its project) in
+  // the sidebar WITHOUT navigating the main panel or touching the URL hash.
+  // Used by the Constellation drill-in so the sidebar tracks the focused
+  // session while the home view stays mounted. Distinct from the real
+  // selection above.
+  previewProjectId: number | null
+  previewSessionId: string | null
+  setPreviewSession: (sessionId: string | null, projectId: number | null) => void
+  clearPreviewSession: () => void
+
   updateProjectSlug: (slug: string) => void
   setSelectedAgentIds: (ids: string[]) => void
   toggleAgentId: (id: string) => void
@@ -153,6 +232,22 @@ interface UIState {
   selectedEventId: number | null
   setSelectedEventId: (id: number | null) => void
 
+  // Default conversation-thread collapse state for newly expanded event
+  // details. In-memory only (default expanded). Detail panels SEED their local
+  // state from this at mount and write back here on toggle — they must NOT
+  // subscribe reactively, or toggling one thread would collapse every open
+  // detail at once and jump the virtualizer scroll.
+  threadCollapsed: boolean
+  setThreadCollapsed: (collapsed: boolean) => void
+
+  // When a thread toggle changes a row's height, EventDetail puts the row's
+  // event id here. EventStream re-measures that row synchronously (in a layout
+  // effect) so the virtualizer reflows and anchors in the same frame — matching
+  // the smooth path estimateSize gives row expand/collapse, instead of the
+  // async ResizeObserver reflow that made thread toggles flash. Cleared after.
+  threadRemeasureEventId: number | null
+  setThreadRemeasureEventId: (id: number | null) => void
+
   // Session being edited in the SessionEditModal (null = closed)
   editingSessionId: string | null
   editingSessionTab: 'details' | 'stats' | 'labels'
@@ -164,6 +259,14 @@ interface UIState {
   // use-route-sync drives the reverse: URL view → modal state on load.
   currentView: string | null
   setCurrentView: (view: string | null) => void
+
+  // The session id or project slug from the URL that failed to resolve to a
+  // real row. Held (not just logged) so MainPanel can render a "not found"
+  // state instead of a blank panel. Compared against the current target, so a
+  // stale error self-clears when the user navigates elsewhere.
+  routeError: string | null
+  setRouteError: (idOrSlug: string | null) => void
+  clearRouteError: () => void
 
   // Labels — user-defined bookmarks across sessions (localStorage only)
   labels: Label[]
@@ -210,6 +313,14 @@ interface UIState {
   notificationsEnabled: boolean
   setNotificationsEnabled: (enabled: boolean) => void
 
+  // Active-session indicator — the green pulse on the sidebar session dot /
+  // project folder after activity. `activeIndicatorEnabled` toggles it;
+  // `activeIndicatorSeconds` is how long it stays lit before fading.
+  activeIndicatorEnabled: boolean
+  setActiveIndicatorEnabled: (enabled: boolean) => void
+  activeIndicatorSeconds: number
+  setActiveIndicatorSeconds: (seconds: number) => void
+
   // Rewind mode: freezes the event/timeline view at a snapshot of events
   rewindMode: boolean
   frozenEvents: EnrichedEvent[] | null
@@ -221,6 +332,12 @@ interface UIState {
   // Session sort order in sidebar
   sessionSortOrder: 'activity' | 'created'
   setSessionSortOrder: (order: 'activity' | 'created') => void
+
+  // Which home-page dashboard theme is active (persisted to localStorage).
+  // See app/client/src/dashboard/ — the registry resolves unknown ids to
+  // the default theme, so this is a free-form string, not a union.
+  dashboardThemeId: string
+  setDashboardThemeId: (id: string) => void
 
   // Pinned sessions (persisted to localStorage)
   pinnedSessionIds: Set<string>
@@ -242,6 +359,11 @@ interface UIState {
    *  list (every activity ping carries projectId; we update both in
    *  one shot). */
   projectPulses: Record<number, number>
+  /** Wall-clock ms of the last activity ping per session. Stamped in
+   *  `pulseSession`. The Constellation dashboard reads this imperatively
+   *  in its animation loop to compute recency "heat" (no React
+   *  subscription, no per-ping re-render). */
+  sessionActivityAt: Record<string, number>
   pulseSession: (sessionId: string, projectId?: number | null) => void
 
   // Version tracking
@@ -432,6 +554,43 @@ export const useUIStore = create<UIState>((set, get) => ({
     if (get().currentView !== view) set({ currentView: view })
     updateHash(state.selectedProjectSlug, id, view)
   },
+  openSession: (projectId, slug, sessionId) => {
+    const state = get()
+    const nextFilterStates = new Map(state.sessionFilterStates)
+    // Save the outgoing session's filter state, restore the incoming one.
+    if (state.selectedSessionId) {
+      nextFilterStates.set(state.selectedSessionId, {
+        activePrimaryFilters: state.activePrimaryFilters,
+        activeSecondaryFilters: state.activeSecondaryFilters,
+        searchQuery: state.searchQuery,
+      })
+    }
+    const restored = nextFilterStates.get(sessionId) ?? DEFAULT_FILTER_STATE
+    const newSlug = slug ?? null
+    const exitingRewind = state.rewindMode && state.selectedSessionId !== sessionId
+    set({
+      selectedProjectId: projectId,
+      selectedProjectSlug: newSlug,
+      selectedSessionId: sessionId,
+      selectedAgentIds: [],
+      expandedEventIds: new Set(),
+      lastExpandedEventId: null,
+      selectedEventId: null,
+      scrollToEventId: null,
+      sessionFilterStates: nextFilterStates,
+      activePrimaryFilters: restored.activePrimaryFilters,
+      activeSecondaryFilters: restored.activeSecondaryFilters,
+      searchQuery: restored.searchQuery,
+      ...(exitingRewind && {
+        rewindMode: false,
+        frozenEvents: null,
+        autoFollow: state.autoFollowBeforeRewind,
+      }),
+    })
+    const view = computeViewFromState(get())
+    if (get().currentView !== view) set({ currentView: view })
+    updateHash(newSlug, sessionId, view) // single history entry
+  },
   updateProjectSlug: (slug) => {
     set({ selectedProjectSlug: slug })
     const state = get()
@@ -508,6 +667,12 @@ export const useUIStore = create<UIState>((set, get) => ({
   selectedEventId: null,
   setSelectedEventId: (id) => set({ selectedEventId: id }),
 
+  threadCollapsed: false,
+  setThreadCollapsed: (collapsed) => set({ threadCollapsed: collapsed }),
+
+  threadRemeasureEventId: null,
+  setThreadRemeasureEventId: (id) => set({ threadRemeasureEventId: id }),
+
   editingSessionId: null,
   editingSessionTab: 'details',
   setEditingSessionId: (id, tab) => {
@@ -523,6 +688,14 @@ export const useUIStore = create<UIState>((set, get) => ({
     set({ currentView: view })
     const state = get()
     updateHash(state.selectedProjectSlug, state.selectedSessionId, view)
+  },
+
+  routeError: null,
+  setRouteError: (idOrSlug) => {
+    if (get().routeError !== idOrSlug) set({ routeError: idOrSlug })
+  },
+  clearRouteError: () => {
+    if (get().routeError !== null) set({ routeError: null })
   },
 
   sidebarTab:
@@ -579,6 +752,22 @@ export const useUIStore = create<UIState>((set, get) => ({
     set({ notificationsEnabled: enabled })
   },
 
+  activeIndicatorEnabled: localStorage.getItem('agents-observe-active-indicator') !== 'off',
+  setActiveIndicatorEnabled: (enabled) => {
+    localStorage.setItem('agents-observe-active-indicator', enabled ? 'on' : 'off')
+    set({ activeIndicatorEnabled: enabled })
+  },
+
+  activeIndicatorSeconds: (() => {
+    const raw = localStorage.getItem('agents-observe-active-indicator-seconds')
+    const n = raw != null ? Number(raw) : NaN
+    return Number.isFinite(n) && n > 0 ? n : ACTIVITY_CONFIG.pulseDurationMs / 1000
+  })(),
+  setActiveIndicatorSeconds: (seconds) => {
+    localStorage.setItem('agents-observe-active-indicator-seconds', String(seconds))
+    set({ activeIndicatorSeconds: seconds })
+  },
+
   rewindMode: false,
   frozenEvents: null,
   autoFollowBeforeRewind: true,
@@ -598,6 +787,21 @@ export const useUIStore = create<UIState>((set, get) => ({
 
   sessionSortOrder: 'activity',
   setSessionSortOrder: (order) => set({ sessionSortOrder: order }),
+
+  // Default to the constellation view on a fresh load; an explicit prior choice
+  // (incl. 'sessions-list') persists via localStorage. Keep the id literal to
+  // avoid importing the dashboard registry into the store (circular).
+  dashboardThemeId: localStorage.getItem('agents-observe-dashboard-theme') || 'constellation',
+  setDashboardThemeId: (id) => {
+    localStorage.setItem('agents-observe-dashboard-theme', id)
+    set({ dashboardThemeId: id })
+  },
+
+  previewProjectId: null,
+  previewSessionId: null,
+  setPreviewSession: (sessionId, projectId) =>
+    set({ previewSessionId: sessionId, previewProjectId: projectId }),
+  clearPreviewSession: () => set({ previewSessionId: null, previewProjectId: null }),
 
   pinnedSessionIds: loadPinnedSessions(),
   togglePinnedSession: (id) =>
@@ -676,25 +880,31 @@ export const useUIStore = create<UIState>((set, get) => ({
 
   sessionPulses: {},
   projectPulses: {},
+  sessionActivityAt: {},
   pulseSession: (sessionId, projectId) =>
     set((s) => {
       const sessionPulses = {
         ...s.sessionPulses,
         [sessionId]: (s.sessionPulses[sessionId] ?? 0) + 1,
       }
+      // Stamp the activity time so the Constellation dashboard can compute
+      // recency heat. Kept in its own map (read imperatively in a rAF loop)
+      // so it never triggers a React render on its own.
+      const sessionActivityAt = { ...s.sessionActivityAt, [sessionId]: Date.now() }
       // Only rebuild the project map when we got a projectId and there's
       // a real bump to record — avoids reference churn on null-project
       // pings (e.g. sessions still in the Unassigned bucket).
       if (projectId != null) {
         return {
           sessionPulses,
+          sessionActivityAt,
           projectPulses: {
             ...s.projectPulses,
             [projectId]: (s.projectPulses[projectId] ?? 0) + 1,
           },
         }
       }
-      return { sessionPulses }
+      return { sessionPulses, sessionActivityAt }
     }),
 
   serverVersion: null,
@@ -705,20 +915,20 @@ export const useUIStore = create<UIState>((set, get) => ({
 
 if (typeof window !== 'undefined') {
   // Seed history for direct URL loads so the back button has somewhere to go.
-  // If loading #/project/session, push #/project first (project view),
-  // then replace with the full URL. Back then goes to project view.
-  // The :view suffix is appended only to the final URL — back navigation
-  // drops into the modal-less view first, then the project view.
-  const viewSuffix = initialView ? `:${initialView}` : ''
-  if (initialProjectSlug && initialSessionId) {
-    window.history.replaceState(null, '', `#/${initialProjectSlug}`)
-    window.history.pushState(null, '', `#/${initialProjectSlug}/${initialSessionId}${viewSuffix}`)
+  // For #/project/session, replace with the project view first, then push the
+  // full URL — Back then drops to the project page. The :view suffix rides only
+  // on the final URL, so Back peels off the modal before the session.
+  if (initialSessionId && initialProjectSlug) {
+    window.history.replaceState(null, '', buildHash(initialProjectSlug, null, null))
+    window.history.pushState(null, '', buildHash(initialProjectSlug, initialSessionId, initialView))
+  } else if (initialSessionId) {
+    // Unknown/unassigned project (`#/_/session`): there is no meaningful
+    // intermediate Back target, so canonicalize in place. useRouteSync resolves
+    // the real project from the session id and rewrites the segment.
+    window.history.replaceState(null, '', buildHash(null, initialSessionId, initialView))
   } else if (initialProjectSlug) {
     window.history.replaceState(null, '', `#/`)
-    window.history.pushState(null, '', `#/${initialProjectSlug}${viewSuffix}`)
-  } else if (initialSessionId && initialView) {
-    // UUID-only shortcut with a view — make sure the suffix lands on the URL.
-    window.history.replaceState(null, '', `#/${initialSessionId}${viewSuffix}`)
+    window.history.pushState(null, '', buildHash(initialProjectSlug, null, initialView))
   }
 
   window.addEventListener('hashchange', () => {
@@ -729,7 +939,16 @@ if (typeof window !== 'undefined') {
     suppressHashPush = true
     try {
       if (projectSlug !== state.selectedProjectSlug) {
-        useUIStore.setState({ selectedProjectSlug: projectSlug })
+        // Browser navigation is authoritative. When the URL carries no
+        // project (Home `#/` or a session-only `#/id`), clear the resolved
+        // `selectedProjectId` too — otherwise MainPanel keeps rendering the
+        // old project and useRouteSync re-adds its slug. A session-only URL
+        // re-resolves its project from the sessionId via useRouteSync.
+        useUIStore.setState(
+          projectSlug
+            ? { selectedProjectSlug: projectSlug }
+            : { selectedProjectSlug: null, selectedProjectId: null },
+        )
       }
       if (sessionId !== state.selectedSessionId) {
         state.setSelectedSessionId(sessionId)

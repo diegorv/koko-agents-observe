@@ -277,6 +277,7 @@ export function TokenUsageSection({
   onAgentClick,
   onPromptClick,
   eventPromptTexts,
+  injectedTranscript,
 }: {
   sessionId: string
   /** Agent id of the main session agent (== session id for claude-code). */
@@ -298,6 +299,11 @@ export function TokenUsageSection({
    *  render as muted + non-clickable since scrollToPrompt would have
    *  nowhere to land. */
   eventPromptTexts: Set<string>
+  /** Pre-computed token dataset for event-native agent classes (e.g. Hermes)
+   *  that have no transcript JSONL. When provided (even null), the internal
+   *  transcript fetch is skipped and this data drives the section. Leave
+   *  undefined for Claude Code, which fetches its transcript here. */
+  injectedTranscript?: TranscriptStatsData | null
 }) {
   // Server-side feature flag. The transcript-stats endpoint costs a
   // jsonl walk; skipping the round-trip entirely when disabled keeps
@@ -310,14 +316,16 @@ export function TokenUsageSection({
     refetchOnWindowFocus: false,
   })
   const transcriptStatsEnabled = health?.transcriptStatsEnabled === true
+  // Event-native classes pass a pre-computed dataset (possibly null); in that
+  // mode we never touch the transcript endpoint.
+  const isInjected = injectedTranscript !== undefined
 
   const { data, isLoading } = useQuery({
     queryKey: ['transcript-stats', sessionId],
     queryFn: () => api.getTranscriptStats(sessionId),
-    // Only fetch transcripts when the server flag is on. If the flag
-    // is off we render the events-only view without ever hitting the
-    // endpoint.
-    enabled: transcriptStatsEnabled,
+    // Only fetch transcripts when the server flag is on AND no dataset was
+    // injected. Otherwise we render from props without hitting the endpoint.
+    enabled: transcriptStatsEnabled && !isInjected,
     staleTime: Infinity,
     gcTime: 0,
     refetchOnWindowFocus: false,
@@ -333,12 +341,17 @@ export function TokenUsageSection({
   // Transcript stats are an *augmentation* layer. The Agents table
   // always renders from event data; transcripts add Model + Est Cost
   // columns and the per-prompt/per-model tables when available.
-  const transcript: TranscriptStatsData | null = data?.ok ? data.data : null
-  const transcriptError = data && !data.ok ? data : null
+  const transcript: TranscriptStatsData | null = isInjected
+    ? injectedTranscript
+    : data?.ok
+      ? data.data
+      : null
+  const transcriptError = isInjected ? null : data && !data.ok ? data : null
   // Distinct from `transcriptError` — the flag isn't an error, it's a
   // deliberate "off" state from the server. Wait until health resolves
-  // before deciding either way (avoids flashing the disabled note).
-  const transcriptDisabledByFlag = health !== undefined && !transcriptStatsEnabled
+  // before deciding either way (avoids flashing the disabled note). Never
+  // shown in injected mode (there's no transcript concept for those classes).
+  const transcriptDisabledByFlag = !isInjected && health !== undefined && !transcriptStatsEnabled
 
   const { agentRows, agentTotals } = useMemo(
     () =>
@@ -468,32 +481,48 @@ export function TokenUsageSection({
               count: transcript.prompts.length,
               sortType: 'string',
               render: (r) => {
-                // Only prompts with a matching UserPromptSubmit event can
-                // scroll. Pre-plugin prompts on resumed sessions render
-                // muted + non-clickable.
-                const hasEvent = eventPromptTexts.has(r.text)
+                // Slash-command prompts render the reconstructed
+                // `/command args` as the primary line (it matches the
+                // UserPromptSubmit/Expansion event) with the expanded skill
+                // body as a muted detail line beneath. Ordinary prompts
+                // just show their text. Match/scroll on the primary line.
+                const label = r.command ?? r.text
+                const detail = r.command ? r.text : null
+                // Only prompts with a matching event can scroll. Pre-plugin
+                // prompts on resumed sessions render muted + non-clickable.
+                const hasEvent = eventPromptTexts.has(label)
+                const body = (
+                  <>
+                    <span className="block truncate max-w-[400px]">{label}</span>
+                    {detail && (
+                      <span className="block truncate max-w-[400px] text-xs text-muted-foreground/50">
+                        {detail}
+                      </span>
+                    )}
+                  </>
+                )
                 if (!hasEvent) {
                   return (
                     <span
-                      className="block truncate max-w-[400px] text-muted-foreground/50"
-                      title={`${r.text}\n\n(no matching event — pre-plugin prompt)`}
+                      className="block text-muted-foreground/50"
+                      title={`${label}\n\n(no matching event — pre-plugin prompt)`}
                     >
-                      {r.text}
+                      {body}
                     </span>
                   )
                 }
                 return (
                   <button
                     type="button"
-                    onClick={() => onPromptClick(r.text, r.timestamp)}
-                    className="block truncate max-w-[400px] text-left cursor-pointer hover:underline"
-                    title={r.text}
+                    onClick={() => onPromptClick(label, r.timestamp)}
+                    className="block text-left cursor-pointer hover:underline"
+                    title={detail ? `${label}\n\n${detail}` : label}
                   >
-                    {r.text}
+                    {body}
                   </button>
                 )
               },
-              sortValue: (r) => r.text,
+              sortValue: (r) => r.command ?? r.text,
             },
             {
               key: 'date',
@@ -885,7 +914,7 @@ export function TokenUsageSection({
             <span>{ERROR_MESSAGES[transcriptError.error] ?? transcriptError.message}</span>
           </div>
         )}
-        {transcriptStatsEnabled && isLoading && !transcript && !transcriptError && (
+        {!isInjected && transcriptStatsEnabled && isLoading && !transcript && !transcriptError && (
           <div className="text-[11px] text-muted-foreground/70 italic">
             Loading model + cost data…
           </div>

@@ -82,6 +82,14 @@ su -s /bin/bash testuser -c "
   export AGENTS_OBSERVE_TEST_SKIP_PULL='$AGENTS_OBSERVE_TEST_SKIP_PULL'
   export AGENTS_OBSERVE_LOG_LEVEL='${AGENTS_OBSERVE_LOG_LEVEL:-trace}'
   export AGENTS_OBSERVE_PROJECT_SLUG='claude-test'
+  # The plugin now publishes its server container on 127.0.0.1 by default
+  # (issue #22). Inside this dind container that binds the dind loopback, so
+  # the host port-forward into the dind eth0 (UI_PORT in the driver script)
+  # cannot reach it: the dashboard is unreachable from the host for the
+  # manual UI check, though curl to 127.0.0.1:4981 still works from inside
+  # the dind. Publish on all interfaces so the forward chain works. Safe:
+  # this dind container is the isolation boundary, not a shared host.
+  export AGENTS_OBSERVE_BIND=0.0.0.0
   export CLAUDE_PLUGIN_ROOT='$CLAUDE_PLUGIN_ROOT'
   claude \
     --plugin-dir /plugin \

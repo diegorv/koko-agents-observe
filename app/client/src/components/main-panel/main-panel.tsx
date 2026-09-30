@@ -14,16 +14,27 @@ import { ProjectPage } from './project-page'
 import { useRegionShortcuts } from '@/hooks/use-region-shortcuts'
 
 export function MainPanel() {
-  const { selectedProjectId, selectedProjectSlug, selectedSessionId } = useUIStore()
+  const { selectedProjectId, selectedProjectSlug, selectedSessionId, routeError } = useUIStore()
 
-  // The URL hash populates `selectedProjectSlug` / `selectedSessionId`
-  // synchronously on store init, but `selectedProjectId` is resolved
-  // asynchronously by `useRouteSync` once /api/projects (and possibly
-  // /api/sessions/:id) has returned. Don't flash HomePage in that
-  // window — it triggers /api/sessions/recent and other home-page
-  // queries that get torn down a tick later.
-  const isResolvingRoute = !selectedProjectId && (!!selectedProjectSlug || !!selectedSessionId)
-  if (isResolvingRoute) {
+  // A session route renders as soon as we know the session id — even with no
+  // resolved (or no existing) project. Unassigned sessions have no project at
+  // all, and skill deep-links (/observe view, /observe stats) plus direct
+  // `#/_/<sessionId>` URLs must ALWAYS land on the session, never a blank panel.
+  // SessionView keys its data off the session id; the project is optional.
+  if (selectedSessionId) {
+    // useRouteSync flags an id that resolved to no row, so a dead deep link
+    // shows a clear message instead of an empty event stream.
+    if (routeError === selectedSessionId) return <RouteNotFound target={selectedSessionId} />
+    return <SessionView sessionId={selectedSessionId} projectId={selectedProjectId} />
+  }
+
+  // No session in the route. A bare project slug from the URL still needs its
+  // id resolved asynchronously by `useRouteSync` (via /api/projects). Render
+  // nothing during that window rather than flashing HomePage — which would
+  // fire /api/sessions/recent and other home queries that get torn down a
+  // tick later.
+  if (!selectedProjectId && selectedProjectSlug) {
+    if (routeError === selectedProjectSlug) return <RouteNotFound target={selectedProjectSlug} />
     return <div className="flex-1" />
   }
 
@@ -31,14 +42,29 @@ export function MainPanel() {
     return <HomePage />
   }
 
-  if (!selectedSessionId) {
-    return <ProjectPage />
-  }
-
-  return <SessionView sessionId={selectedSessionId} projectId={selectedProjectId} />
+  return <ProjectPage />
 }
 
-function SessionView({ sessionId, projectId }: { sessionId: string; projectId: number }) {
+// Shown when a URL references a session id / project slug that no longer
+// exists (e.g. a stale bookmark or a deleted session). Clicking returns home.
+function RouteNotFound({ target }: { target: string }) {
+  const setSelectedProject = useUIStore((s) => s.setSelectedProject)
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center text-muted-foreground">
+      <p className="text-sm">
+        Nothing found for <span className="font-mono text-foreground">{target}</span>.
+      </p>
+      <button
+        className="text-sm text-foreground underline underline-offset-4 hover:opacity-80 cursor-pointer"
+        onClick={() => setSelectedProject(null)}
+      >
+        Back to dashboard
+      </button>
+    </div>
+  )
+}
+
+function SessionView({ sessionId, projectId }: { sessionId: string; projectId: number | null }) {
   useRegionShortcuts()
   const { data: sessions } = useSessions(projectId)
   const effectiveSessionId = sessionId || sessions?.[0]?.id || null

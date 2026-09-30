@@ -310,16 +310,21 @@ describe('observe_cli', () => {
     })
 
     it('skips auto-start when custom API URL is set and unreachable', async () => {
+      // Use a closed loopback port (matching the sibling hook-sync tests
+      // above) rather than an external hostname. A bare name like
+      // `remote-server` is not hermetic: DNS search domains, mDNS, or a
+      // transparent HTTP proxy can resolve/answer it, making the request
+      // unexpectedly succeed and this assertion flap.
       const { stdout } = await runCli(['hook-autostart'], {
         stdin: JSON.stringify({ hook_event_name: 'SessionStart' }),
         env: {
-          AGENTS_OBSERVE_API_BASE_URL: 'http://remote-server:9999/api',
+          AGENTS_OBSERVE_API_BASE_URL: 'http://127.0.0.1:19999/api',
           AGENTS_OBSERVE_HOOK_STARTUP_TIMEOUT: '1000',
         },
       })
       const parsed = JSON.parse(stdout)
       expect(parsed.systemMessage).toContain('unreachable')
-      expect(parsed.systemMessage).toContain('remote-server:9999')
+      expect(parsed.systemMessage).toContain('127.0.0.1:19999')
     })
 
     it('always returns valid JSON even on error', async () => {

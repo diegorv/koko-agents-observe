@@ -22,6 +22,13 @@ import type { EventEnvelope, ParsedEvent } from '../types'
 import { validateEnvelope, EnvelopeValidationError } from '../parser'
 import { resolveProject } from '../services/project-resolver'
 import { computeEventSignature } from '../utils/event-signature'
+import {
+  isBackgroundTick,
+  backgroundAgentId,
+  BACKGROUND_LANE_NAME,
+  BACKGROUND_LANE_TYPE,
+  BACKGROUND_LANE_DESCRIPTION,
+} from '../services/background-tick'
 import { config } from '../config'
 import { apiError } from '../errors'
 
@@ -84,6 +91,24 @@ router.post('/events', async (c) => {
     return c.json({ id: existing.id, deduplicated: true }, 201)
   }
 
+  // ---- Step 1.6: collapse background poll ticks ---------------------------
+  // A SubagentStop with no agent_type is a background poll tick, not a
+  // subagent — Claude Code mints a throwaway agent id per tick while
+  // background work is in flight. Reroute it onto the session's single
+  // background lane so it doesn't become its own agent row. Deliberately
+  // after the signature hash so dedup semantics are untouched; the tick's
+  // original id survives in the stored payload's `agent_id`.
+  let isTick = false
+  try {
+    if (isBackgroundTick(envelope, await store.getAgentById(envelope.agentId))) {
+      isTick = true
+      envelope = { ...envelope, agentId: backgroundAgentId(envelope.sessionId) }
+    }
+  } catch (err) {
+    // A failed lookup must never drop the event; fall through un-rerouted.
+    console.error('[background-tick] classification failed, storing as-is:', err)
+  }
+
   try {
     // ---- Step 2: upsert session ------------------------------------------
     // Read existing row first so we can tell whether this is a fresh
@@ -123,9 +148,9 @@ router.post('/events', async (c) => {
       envelope.agentId,
       envelope.sessionId, // accepted for backwards-compat; not persisted
       null,
-      agentHints?.name ?? null,
-      agentHints?.description ?? null,
-      agentHints?.type ?? null,
+      isTick ? BACKGROUND_LANE_NAME : (agentHints?.name ?? null),
+      isTick ? BACKGROUND_LANE_DESCRIPTION : (agentHints?.description ?? null),
+      isTick ? BACKGROUND_LANE_TYPE : (agentHints?.type ?? null),
       envelope.agentClass,
     )
 

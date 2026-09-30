@@ -1,9 +1,57 @@
 import type { Agent } from '@/types'
 
+/**
+ * Suffix the server appends to a session id to form its background lane —
+ * the single row every background poll tick collapses onto. Mirrors
+ * BACKGROUND_LANE_SUFFIX in app/server/src/services/background-tick.ts.
+ */
+export const BACKGROUND_LANE_SUFFIX = ':background'
+const BACKGROUND_LANE_LABEL = 'Background'
+
+/** True for the synthetic per-session background lane. */
+export function isBackgroundLane(agentId: string): boolean {
+  return agentId.endsWith(BACKGROUND_LANE_SUFFIX)
+}
+
 // Display name for an agent: name (short) → description → truncated ID
 export function getAgentDisplayName(agent: Agent): string {
+  // Checked before the root-agent rule: the lane has no parentAgentId, so
+  // it would otherwise be labelled "Main".
+  if (isBackgroundLane(agent.id)) return agent.name || BACKGROUND_LANE_LABEL
   if (!agent.parentAgentId) return 'Main'
   return agent.name || agent.description || agent.id.slice(0, 8)
+}
+
+/**
+ * Order agents into timeline rows: Main first, then the background lane,
+ * then real subagents newest-first.
+ *
+ * The lane carries no parentAgentId (nothing spawned it), so without the
+ * explicit pin it would sort in with the root agents and drift above Main.
+ * It is flagged `isSubagent` so it renders with the indented lane styling
+ * rather than as a second root row.
+ */
+export function orderAgentLanes(
+  agents: Agent[],
+  selectedAgentIds: string[],
+): { agent: Agent; isSubagent: boolean }[] {
+  const mainAgents: { agent: Agent; isSubagent: boolean }[] = []
+  const subAgents: { agent: Agent; isSubagent: boolean }[] = []
+  let backgroundLane: { agent: Agent; isSubagent: boolean } | null = null
+
+  for (const a of agents) {
+    if (selectedAgentIds.length > 0 && !selectedAgentIds.includes(a.id)) continue
+    if (isBackgroundLane(a.id)) {
+      backgroundLane = { agent: a, isSubagent: true }
+    } else if (!a.parentAgentId) {
+      mainAgents.push({ agent: a, isSubagent: false })
+    } else {
+      subAgents.push({ agent: a, isSubagent: true })
+    }
+  }
+  // Reverse non-main agents so newest appear right after Main
+  subAgents.reverse()
+  return [...mainAgents, ...(backgroundLane ? [backgroundLane] : []), ...subAgents]
 }
 
 // ── Agent colors ──────────────────────────────────────────────────────

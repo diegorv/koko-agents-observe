@@ -2,6 +2,7 @@ import { WebSocketServer, WebSocket } from 'ws'
 import type { Server } from 'http'
 import type { WSClientMessage } from './types'
 import { config } from './config'
+import { isWsOriginAllowed } from './cors'
 import { checkShutdown, cancelPendingShutdown } from './consumer-tracker'
 
 const LOG_LEVEL = config.logLevel
@@ -24,7 +25,22 @@ export function parseClientMessage(raw: string): WSClientMessage | null {
 }
 
 export function attachWebSocket(server: Server) {
-  const wss = new WebSocketServer({ server, path: '/api/events/stream' })
+  const wss = new WebSocketServer({
+    server,
+    path: '/api/events/stream',
+    // Reject cross-origin browser connections. The event stream is
+    // unauthenticated, so without this a page the user visits could open
+    // ws://localhost and read the feed (CORS doesn't gate WebSockets). Uses
+    // the same allowlist as HTTP CORS (AGENTS_OBSERVE_CORS_ORIGINS). See
+    // GitHub issue #22.
+    verifyClient: (info) => {
+      const allowed = isWsOriginAllowed(info.origin, config.corsAllowedOrigins ?? [])
+      if (!allowed) {
+        console.warn(`[WS] Rejected connection from disallowed origin: ${info.origin}`)
+      }
+      return allowed
+    },
+  })
 
   wss.on('connection', (ws) => {
     allClients.add(ws)

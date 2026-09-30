@@ -20,6 +20,7 @@ const ReactDiffViewer = lazy(() => import('react-diff-viewer-continued'))
 import { cn } from '@/lib/utils'
 import { getAgentDisplayName } from '@/lib/agent-utils'
 import { resolveEventIcon } from '@/lib/event-icon-registry'
+import { useUIStore } from '@/stores/ui-store'
 import { getEventSummary, relativePath } from './helpers'
 import { computeRuntimeMs, formatRuntime } from './runtime'
 import type { FrameworkDataApi } from '../types'
@@ -197,8 +198,34 @@ export function ClaudeCodeEventDetail({
 
   const showThread = THREAD_SUBTYPES.includes(event.hookName)
 
-  // Load turn events for thread-style display
+  // Load turn events for thread-style display. Gate on `displayEventStream`
+  // so the thread mirrors the event stream: events excluded by the All filter
+  // (e.g. PostToolBatch) and merge-hidden Post events are dropped. Merged Pre
+  // rows already carry their final status from the store, so dropping the
+  // folded Post events doesn't lose the completed/failed indicator.
   const turnEvents = event.turnId ? dataApi.getTurnEvents(event.turnId) : []
+  const threadRows = showThread ? dedupeThread(turnEvents.filter((e) => e.displayEventStream)) : []
+
+  // Thread collapse is LOCAL to this detail panel, seeded once from the store
+  // default at mount. Toggling writes back to the store so the next expanded
+  // row picks up the choice — but we never subscribe reactively, so toggling
+  // one open thread doesn't collapse every other open detail (which would jump
+  // the virtualizer scroll). Re-expanding a row remounts and re-seeds.
+  const [threadCollapsed, setThreadCollapsedLocal] = useState(
+    () => useUIStore.getState().threadCollapsed,
+  )
+  const toggleThreadCollapsed = () => {
+    const next = !threadCollapsed
+    setThreadCollapsedLocal(next)
+    const store = useUIStore.getState()
+    store.setThreadCollapsed(next)
+    // Ask the stream to re-measure this row synchronously once our height
+    // change commits, so the virtualizer reflows (and anchors scroll) in the
+    // same frame — the same smooth path row expand/collapse gets from its
+    // estimateSize change, rather than the async ResizeObserver reflow that
+    // made thread toggles flash. No-op outside the virtualized stream.
+    store.setThreadRemeasureEventId(event.id)
+  }
 
   // Get grouped events (e.g., Pre + Post for tool calls)
   const groupedEvents = event.groupId ? dataApi.getGroupedEvents(event.groupId) : []
@@ -239,25 +266,9 @@ export function ClaudeCodeEventDetail({
         return ms != null ? <DetailRow label="Runtime" value={formatRuntime(ms)} /> : null
       })()}
 
-      {/* Conversation thread for UserPrompt / Stop / Subagent events */}
-      {showThread && (
-        <div>
-          <div className="text-muted-foreground mb-1.5 font-medium">Conversation thread:</div>
-          {turnEvents.length > 0 ? (
-            <div className="space-y-0.5 rounded border border-border/50 bg-muted/20 p-1.5">
-              {dedupeThread(turnEvents).map((e) => (
-                <ThreadEvent key={e.id} event={e} isCurrentEvent={e.id === event.id} />
-              ))}
-            </div>
-          ) : (
-            <div className="text-muted-foreground/80 dark:text-muted-foreground/60 py-1">
-              No thread events found
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Raw payload section(s) — two for paired tool rows, one otherwise */}
+      {/* Raw payload section(s) — two for paired tool rows, one otherwise.
+          Kept above the conversation thread so it's reachable without
+          scrolling past a long turn. */}
       {pairedEvent ? (
         <>
           <RawPayloadSection
@@ -277,6 +288,49 @@ export function ClaudeCodeEventDetail({
           timestamp={event.timestamp}
           payload={event.payload as Record<string, unknown>}
         />
+      )}
+
+      {/* Conversation thread for UserPrompt / Stop / Subagent events.
+          Collapsible — collapse state lives in the UI store (session-wide). */}
+      {showThread && (
+        <div>
+          <div
+            className="mb-1.5 flex items-center gap-1 font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            onClick={toggleThreadCollapsed}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                toggleThreadCollapsed()
+              }
+            }}
+          >
+            {threadCollapsed ? (
+              <ChevronRight className="h-3 w-3" />
+            ) : (
+              <ChevronDown className="h-3 w-3" />
+            )}
+            <span>Conversation thread</span>
+            {threadCollapsed && threadRows.length > 0 && (
+              <span className="ml-1 text-[10px] text-muted-foreground/70 tabular-nums">
+                ({threadRows.length})
+              </span>
+            )}
+          </div>
+          {!threadCollapsed &&
+            (threadRows.length > 0 ? (
+              <div className="space-y-0.5 rounded border border-border/50 bg-muted/20 p-1.5">
+                {threadRows.map((e) => (
+                  <ThreadEvent key={e.id} event={e} isCurrentEvent={e.id === event.id} />
+                ))}
+              </div>
+            ) : (
+              <div className="text-muted-foreground/80 dark:text-muted-foreground/60 py-1">
+                No thread events found
+              </div>
+            ))}
+        </div>
       )}
     </div>
   )
@@ -501,6 +555,9 @@ function ToolDetail({
       <div className="space-y-1.5">
         {event.toolName && <DetailRow label="Tool" value={event.toolName} />}
         {failTi.command && <DetailCode label="Command" value={failTi.command} />}
+        {/* StructuredOutput failures: show the rejected/partial output above
+            the schema-validation error so both are visible. */}
+        {event.toolName === 'StructuredOutput' && <StructuredOutputDetail data={failTi} />}
         {payload.error && (
           <DetailCode
             label="Error"
@@ -560,8 +617,7 @@ function ToolDetail({
                 const statusTo = statusChange?.to || ti.status
                 const activeForm = ti.activeForm as string | undefined
                 const desc = (ti.description || ti.subject || ep.task_description) as
-                  | string
-                  | undefined
+                  string | undefined
                 const label =
                   e.hookName === 'TaskCreated'
                     ? 'Created'
@@ -829,8 +885,7 @@ function ToolDetail({
       const postPayload = pairedEvent?.payload as Record<string, any> | undefined
       const toolResponse = postPayload?.tool_response || payload.tool_response
       const spawnedAgentId = (toolResponse?.agentId || postPayload?.tool_response?.agentId) as
-        | string
-        | undefined
+        string | undefined
       const spawnedAgent = spawnedAgentId ? getAgent(spawnedAgentId) : undefined
       const agentAssignedName = spawnedAgent ? getAgentDisplayName(spawnedAgent) : null
       const agentRawName = ti.name as string | undefined
@@ -845,6 +900,43 @@ function ToolDetail({
           {ti.description && <DetailRow label="Task" value={ti.description} />}
           {ti.prompt && <DetailCode label="Prompt" value={ti.prompt} />}
           {agentResult && <DetailCode label="Result" value={agentResult} />}
+        </div>
+      )
+    }
+    case 'Workflow': {
+      // tool_input: { name?, args?, script?, scriptPath? }. The response
+      // (PostToolUse) carries the launched run's identity. Args is the
+      // research question / params; script is large so it lands in a
+      // scrollable code block.
+      const wfPost = (pairedEvent?.payload || payload) as Record<string, any>
+      const wfResp = (wfPost.tool_response as Record<string, any> | undefined) ?? undefined
+      const argsText =
+        ti.args == null
+          ? ''
+          : typeof ti.args === 'string'
+            ? ti.args
+            : JSON.stringify(ti.args, null, 2)
+      return (
+        <div className="space-y-1.5">
+          {ti.name && <DetailRow label="Workflow" value={String(ti.name)} />}
+          {wfResp?.status && <DetailRow label="Status" value={String(wfResp.status)} />}
+          {wfResp?.runId && <DetailRow label="Run ID" value={String(wfResp.runId)} />}
+          {wfResp?.taskId && <DetailRow label="Task ID" value={String(wfResp.taskId)} />}
+          {wfResp?.summary && <DetailRow label="Summary" value={String(wfResp.summary)} />}
+          {argsText && <DetailCode label="Args" value={argsText} />}
+          {wfResp?.transcriptDir && (
+            <DetailRow label="Transcript" value={relativePath(wfResp.transcriptDir, cwd)} />
+          )}
+          {(wfResp?.scriptPath || ti.scriptPath) && (
+            <DetailRow
+              label="Script"
+              value={relativePath(String(wfResp?.scriptPath ?? ti.scriptPath), cwd)}
+            />
+          )}
+          {typeof ti.script === 'string' && ti.script && (
+            <DetailCode label="Source" value={ti.script} />
+          )}
+          {result && <DetailCode label="Result" value={formatResult(result)} />}
         </div>
       )
     }
@@ -874,6 +966,24 @@ function ToolDetail({
           ))}
         </div>
       )
+    }
+    case 'StructuredOutput': {
+      // tool_input *is* the structured payload. The Pre event's own
+      // tool_input is often partial (just `summary`); the full schema data
+      // lands on the paired Post event, which also carries `error` on
+      // PostToolUseFailure. Payloads aren't merged onto this Pre row, so we
+      // read the Post side explicitly. tool_response is only a "provided
+      // successfully" confirmation, so it's not shown.
+      const soPost = pairedEvent?.payload as Record<string, any> | undefined
+      const soData = { ...ti, ...(soPost?.tool_input as Record<string, any> | undefined) }
+      const soErrRaw = soPost?.error ?? payload.error
+      const soError =
+        typeof soErrRaw === 'string'
+          ? soErrRaw
+          : soErrRaw
+            ? JSON.stringify(soErrRaw, null, 2)
+            : undefined
+      return <StructuredOutputDetail data={soData} error={soError} />
     }
     default: {
       // Extract any base64 images from the tool_response so MCP tools
@@ -1063,6 +1173,40 @@ function AskUserQuestionBlock({
   )
 }
 
+/** Hybrid render for a StructuredOutput payload: elevate the conventional
+ *  `summary` field as a labeled row, then dump the remaining schema-defined
+ *  fields as one formatted JSON block. Shared by the PostToolUse tool switch
+ *  and the PostToolUseFailure block (where `data` is the rejected output). */
+// Fields lifted out of the JSON `Output` block into their own DetailCode rows.
+// They're frequently long markdown, far more readable rendered on their own
+// than escaped inside a JSON dump. `summary` is always elevated; `reasoning`
+// and `refinedFix` follow when present.
+const STRUCTURED_OUTPUT_ELEVATED = ['summary', 'reasoning', 'refinedFix'] as const
+
+function StructuredOutputDetail({ data, error }: { data: Record<string, any>; error?: string }) {
+  const str = (k: string) => (typeof data[k] === 'string' ? (data[k] as string) : undefined)
+  const summary = str('summary')
+  const reasoning = str('reasoning')
+  const refinedFix = str('refinedFix')
+  const rest: Record<string, any> = {}
+  for (const [k, v] of Object.entries(data)) {
+    if ((STRUCTURED_OUTPUT_ELEVATED as readonly string[]).includes(k) && typeof v === 'string') {
+      continue
+    }
+    rest[k] = v
+  }
+  const hasRest = Object.keys(rest).length > 0
+  return (
+    <div className="space-y-1.5">
+      {summary && <DetailCode label="Summary" value={summary} />}
+      {reasoning && <DetailCode label="Reasoning" value={reasoning} />}
+      {refinedFix && <DetailCode label="Refined fix" value={refinedFix} />}
+      {hasRest && <DetailCode label="Output" value={JSON.stringify(rest, null, 2)} />}
+      {error && <DetailCode label="Error" value={error} />}
+    </div>
+  )
+}
+
 function DetailRow({ label, value }: { label: string; value?: string }) {
   if (!value) return null
   return (
@@ -1230,10 +1374,26 @@ function ThreadEvent({
   const displayLabel = LABEL_MAP[rawLabel] || rawLabel
   const summary = event.summary || getEventSummary(event as any, event.hookName, event.toolName)
 
+  // Clicking scrolls the matching row into view in the event stream. We read
+  // the action lazily from the store at click time (no per-row subscription),
+  // and reuse the existing scrollToEventId effect — which resolves hidden/
+  // merged events and flashes the target — so there are no refs or new state.
+  const scrollToEvent = () => useUIStore.getState().setScrollToEventId(event.id)
+
   return (
     <div
+      role="button"
+      tabIndex={0}
+      title="Scroll to this event in the stream"
+      onClick={scrollToEvent}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          scrollToEvent()
+        }
+      }}
       className={cn(
-        'flex items-center gap-2 px-2 py-0.5 rounded text-2xs',
+        'flex items-center gap-2 px-2 py-0.5 rounded text-2xs cursor-pointer hover:bg-accent/60',
         isCurrentEvent ? 'bg-primary/10 font-medium' : 'text-muted-foreground',
       )}
     >

@@ -15,7 +15,6 @@ const envKeys = [
   'AGENTS_OBSERVE_PROJECT_SLUG',
   'AGENTS_OBSERVE_DOCKER_CONTAINER_NAME',
   'AGENTS_OBSERVE_DOCKER_IMAGE',
-  'AGENTS_OBSERVE_DATA_DIR',
   'AGENTS_OBSERVE_LOGS_DIR',
   'AGENTS_OBSERVE_LOG_LEVEL',
   'AGENTS_OBSERVE_TEST_SKIP_PULL',
@@ -25,6 +24,9 @@ const envKeys = [
   'AGENTS_OBSERVE_ALLOW_LOCAL_CALLBACKS',
   'AGENTS_OBSERVE_HOOK_STARTUP_TIMEOUT',
   'AGENTS_OBSERVE_NOTIFICATION_ON_EVENTS',
+  'AGENTS_OBSERVE_BIND',
+  'AGENTS_OBSERVE_CORS_ORIGINS',
+  'AGENTS_OBSERVE_SELINUX_RELABEL',
 ]
 
 let savedEnv
@@ -129,6 +131,65 @@ describe('config', () => {
     expect(cfg.runtime).toBe('dev')
   })
 
+  // --- Server bind host (issue #22) ---
+
+  it('defaults serverBindHost to loopback', async () => {
+    const cfg = await loadConfig()
+    expect(cfg.serverBindHost).toBe('127.0.0.1')
+  })
+
+  it('reads AGENTS_OBSERVE_BIND', async () => {
+    process.env.AGENTS_OBSERVE_BIND = '0.0.0.0'
+    const cfg = await loadConfig()
+    expect(cfg.serverBindHost).toBe('0.0.0.0')
+  })
+
+  it('accepts bindHost via overrides', async () => {
+    const cfg = await loadConfig({ bindHost: '192.168.1.5' })
+    expect(cfg.serverBindHost).toBe('192.168.1.5')
+  })
+
+  // --- CORS origins (issue #22) ---
+
+  it('defaults corsOrigins to empty', async () => {
+    const cfg = await loadConfig()
+    expect(cfg.corsOrigins).toBe('')
+  })
+
+  it('reads AGENTS_OBSERVE_CORS_ORIGINS', async () => {
+    process.env.AGENTS_OBSERVE_CORS_ORIGINS = 'https://a.example,https://b.example'
+    const cfg = await loadConfig()
+    expect(cfg.corsOrigins).toBe('https://a.example,https://b.example')
+  })
+
+  // --- SELinux relabel (issue #20) ---
+
+  it('resolves selinuxRelabel to a boolean by default (auto-detect)', async () => {
+    const cfg = await loadConfig()
+    expect(typeof cfg.selinuxRelabel).toBe('boolean')
+  })
+
+  it('forces selinuxRelabel on via AGENTS_OBSERVE_SELINUX_RELABEL', async () => {
+    for (const v of ['1', 'true', 'on', 'yes']) {
+      process.env.AGENTS_OBSERVE_SELINUX_RELABEL = v
+      const cfg = await loadConfig()
+      expect(cfg.selinuxRelabel).toBe(true)
+    }
+  })
+
+  it('forces selinuxRelabel off via AGENTS_OBSERVE_SELINUX_RELABEL (overrides detection)', async () => {
+    for (const v of ['0', 'false', 'off']) {
+      process.env.AGENTS_OBSERVE_SELINUX_RELABEL = v
+      const cfg = await loadConfig()
+      expect(cfg.selinuxRelabel).toBe(false)
+    }
+  })
+
+  it('accepts selinuxRelabel via overrides', async () => {
+    expect((await loadConfig({ selinuxRelabel: 'on' })).selinuxRelabel).toBe(true)
+    expect((await loadConfig({ selinuxRelabel: 'off' })).selinuxRelabel).toBe(false)
+  })
+
   // --- isPlugin ---
 
   it('sets isPlugin false when CLAUDE_PLUGIN_DATA is unset', async () => {
@@ -144,15 +205,9 @@ describe('config', () => {
 
   // --- Data directories ---
 
-  it('derives dataDir from localDataRootDir when AGENTS_OBSERVE_DATA_DIR is unset', async () => {
+  it('derives dataDir as localDataRootDir/data', async () => {
     const cfg = await loadConfig()
     expect(cfg.dataDir).toBe(`${cfg.localDataRootDir}/data`)
-  })
-
-  it('prefers AGENTS_OBSERVE_DATA_DIR over localDataRootDir', async () => {
-    process.env.AGENTS_OBSERVE_DATA_DIR = '/custom/data'
-    const cfg = await loadConfig()
-    expect(cfg.dataDir).toBe('/custom/data')
   })
 
   it('uses AGENTS_OBSERVE_LOCAL_DATA_ROOT when set', async () => {
@@ -181,9 +236,23 @@ describe('config', () => {
     expect(cfg.localDataRootDir).toBe(`${process.env.HOME}/.agents-observe`)
   })
 
-  it('defaults localDataRootDir to ./data when not a plugin', async () => {
+  it('defaults localDataRootDir to $HOME/.agents-observe when not a plugin', async () => {
+    // Pre-fix this fell back to installDir/data, which lives under the
+    // version-scoped plugin cache dir and gets orphaned on every plugin
+    // upgrade — see GitHub issue #17. The stable per-user path survives.
     const cfg = await loadConfig()
-    expect(cfg.localDataRootDir).toBe(`${cfg.installDir}/data`)
+    expect(cfg.localDataRootDir).toBe(`${process.env.HOME}/.agents-observe`)
+  })
+
+  it('flags usingDefaultDataDir true when AGENTS_OBSERVE_LOCAL_DATA_ROOT is unset', async () => {
+    const cfg = await loadConfig()
+    expect(cfg.usingDefaultDataDir).toBe(true)
+  })
+
+  it('flags usingDefaultDataDir false when AGENTS_OBSERVE_LOCAL_DATA_ROOT is set', async () => {
+    process.env.AGENTS_OBSERVE_LOCAL_DATA_ROOT = '/custom/root'
+    const cfg = await loadConfig()
+    expect(cfg.usingDefaultDataDir).toBe(false)
   })
 
   // --- Logs ---
@@ -429,6 +498,16 @@ describe('getServerEnv', () => {
     expect(env.AGENTS_OBSERVE_STORAGE_ADAPTER).toBe('sqlite')
   })
 
+  it('sets HOST_DB_PATH to the host bind mount target in docker', async () => {
+    const mod = await loadModule()
+    const cfg = mod.getConfig({ runtime: 'docker' })
+    const env = mod.getServerEnv(cfg)
+
+    expect(env.AGENTS_OBSERVE_HOST_DB_PATH).toBe(`${cfg.dataDir}/observe.db`)
+    // Container-side DB_PATH is unchanged.
+    expect(env.AGENTS_OBSERVE_DB_PATH).toBe('/data/observe.db')
+  })
+
   it('uses host paths for local runtime', async () => {
     const mod = await loadModule()
     const cfg = mod.getConfig({ runtime: 'local' })
@@ -440,6 +519,9 @@ describe('getServerEnv', () => {
     expect(env.AGENTS_OBSERVE_CLIENT_DIST_PATH).toContain('app/client/dist')
     expect(env.AGENTS_OBSERVE_CLIENT_DIST_PATH).toContain(cfg.installDir)
     expect(env.AGENTS_OBSERVE_RUNTIME).toBe('local')
+    // In local mode the server falls back to DB_PATH, so HOST_DB_PATH
+    // is left empty to keep the env minimal.
+    expect(env.AGENTS_OBSERVE_HOST_DB_PATH).toBe('')
   })
 
   it('sets empty CLIENT_DIST_PATH and RUNTIME_DEV for dev runtime', async () => {
@@ -452,6 +534,40 @@ describe('getServerEnv', () => {
     expect(env.AGENTS_OBSERVE_RUNTIME).toBe('local')
     expect(env.AGENTS_OBSERVE_RUNTIME_DEV).toBe('1')
     expect(env.AGENTS_OBSERVE_SHUTDOWN_DELAY_MS).toBe(String(cfg.shutdownDelayMs))
+  })
+
+  // --- Bind host + CORS passthrough (issue #22) ---
+
+  it('binds the container to 0.0.0.0 in docker (host -p enforces loopback)', async () => {
+    const mod = await loadModule()
+    const env = mod.getServerEnv(mod.getConfig({ runtime: 'docker' }))
+    expect(env.AGENTS_OBSERVE_BIND_HOST).toBe('0.0.0.0')
+  })
+
+  it('binds the configured host directly in local mode', async () => {
+    const mod = await loadModule()
+    const env = mod.getServerEnv(mod.getConfig({ runtime: 'local' }))
+    expect(env.AGENTS_OBSERVE_BIND_HOST).toBe('127.0.0.1')
+  })
+
+  it('forwards AGENTS_OBSERVE_BIND to the local listen host', async () => {
+    process.env.AGENTS_OBSERVE_BIND = '0.0.0.0'
+    const mod = await loadModule()
+    const env = mod.getServerEnv(mod.getConfig({ runtime: 'local' }))
+    expect(env.AGENTS_OBSERVE_BIND_HOST).toBe('0.0.0.0')
+  })
+
+  it('omits the CORS allowlist env when unset', async () => {
+    const mod = await loadModule()
+    const env = mod.getServerEnv(mod.getConfig({ runtime: 'docker' }))
+    expect(env.AGENTS_OBSERVE_CORS_ORIGINS).toBeUndefined()
+  })
+
+  it('forwards the CORS allowlist env when set', async () => {
+    process.env.AGENTS_OBSERVE_CORS_ORIGINS = 'https://a.example,https://b.example'
+    const mod = await loadModule()
+    const env = mod.getServerEnv(mod.getConfig({ runtime: 'docker' }))
+    expect(env.AGENTS_OBSERVE_CORS_ORIGINS).toBe('https://a.example,https://b.example')
   })
 
   it('always includes log level and storage adapter', async () => {

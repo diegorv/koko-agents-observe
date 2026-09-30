@@ -91,8 +91,13 @@ export const api = {
   getProjects: () => fetchJson<Project[]>('/projects'),
   getPendingNotifications: (sinceTs: number) =>
     fetchJson<NotificationPayload[]>(`/notifications?since=${sinceTs}`),
-  getRecentSessions: (limit?: number) =>
-    fetchJson<RecentSession[]>(`/sessions/recent${limit ? `?limit=${limit}` : ''}`),
+  getRecentSessions: (limit?: number, since?: number) => {
+    const params = new URLSearchParams()
+    if (limit) params.set('limit', String(limit))
+    if (since != null) params.set('since', String(since))
+    const qs = params.toString()
+    return fetchJson<RecentSession[]>(`/sessions/recent${qs ? `?${qs}` : ''}`)
+  },
   getUnassignedSessions: (limit?: number) =>
     fetchJson<RecentSession[]>(`/sessions/unassigned${limit ? `?limit=${limit}` : ''}`),
   getSessions: (projectId: number) => fetchJson<Session[]>(`/projects/${projectId}/sessions`),
@@ -247,6 +252,19 @@ export const api = {
     }
     return { ok: true, status: 200, data: body as TranscriptStatsData }
   },
+
+  /** Look up model pricing by id. Used by event-native agent classes (e.g.
+   *  Hermes) that compute cost client-side from event token usage instead of
+   *  a transcript. Returns id → pricing (null when unknown). */
+  getModelPricing: async (
+    ids: string[],
+  ): Promise<Record<string, TranscriptStatsModelPricing | null>> => {
+    if (ids.length === 0) return {}
+    const res = await fetch(`${API_BASE}/models/pricing?ids=${encodeURIComponent(ids.join(','))}`)
+    if (!res.ok) return {}
+    const body = await res.json().catch(() => ({}))
+    return (body.pricing ?? {}) as Record<string, TranscriptStatsModelPricing | null>
+  },
 }
 
 // ── Transcript stats types (V2: matches server transcript-parser) ──
@@ -265,6 +283,10 @@ export interface TranscriptStatsByModel {
 export interface TranscriptStatsPrompt {
   promptId: string
   text: string
+  /** Reconstructed `/name args` for slash-command prompts (rendered as the
+   *  primary clickable line, with `text` as the expanded detail beneath);
+   *  null for ordinary typed prompts. */
+  command: string | null
   timestamp: number
   durationMs: number | null
   toolCount: number

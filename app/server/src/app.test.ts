@@ -103,3 +103,38 @@ describe('dev mode redirect', () => {
     expect(res.headers.get('location')).toBe('http://localhost:9999')
   })
 })
+
+describe('CORS default policy (issue #22)', () => {
+  // Uses the real config (no doMock) so corsAllowedOrigins defaults to empty
+  // → loopback-reflect. resetModules keeps this isolated from the doMock'd
+  // config in the suite above.
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  test('reflects a loopback origin', async () => {
+    const { createApp } = await import('./app')
+    const app = createApp(stubStore, noop, noop, noop)
+
+    const res = await app.request('/api/health', {
+      method: 'GET',
+      headers: { Origin: 'http://localhost:5174' },
+    })
+    expect(res.headers.get('access-control-allow-origin')).toBe('http://localhost:5174')
+  })
+
+  test('does not allow a non-loopback origin', async () => {
+    const { createApp } = await import('./app')
+    const app = createApp(stubStore, noop, noop, noop)
+
+    const res = await app.request('/api/health', {
+      method: 'GET',
+      headers: { Origin: 'https://evil.com' },
+    })
+    expect(res.headers.get('access-control-allow-origin')).toBeNull()
+  })
+})

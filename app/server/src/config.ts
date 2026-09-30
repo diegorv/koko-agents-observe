@@ -7,6 +7,22 @@ import { fileURLToPath } from 'url'
 
 const logLevel = (process.env.AGENTS_OBSERVE_LOG_LEVEL || 'debug').toLowerCase()
 
+/**
+ * Resolve the host-side DB path surfaced on `/api/health`.
+ *
+ * In docker the CLI passes `AGENTS_OBSERVE_HOST_DB_PATH` — an already-absolute
+ * path on the *host*, which may be a Windows path (`C:\Users\...`). Running
+ * `resolve()` on it inside the Linux container mangles it, because POSIX
+ * `resolve` treats `C:\...` as relative and prefixes the container cwd
+ * (`/app/server/C:\Users\...`) — GitHub issue #21. So pass it through
+ * verbatim; only the local-mode fallback (a real path on this OS) needs
+ * `resolve()`.
+ */
+export function resolveHostDbPath(hostDbPath?: string, dbPath?: string): string {
+  if (hostDbPath) return hostDbPath
+  return resolve(dbPath || '../../data/observe.db')
+}
+
 function detectRuntime(): 'docker' | 'local' {
   const explicit = process.env.AGENTS_OBSERVE_RUNTIME
   if (explicit === 'docker' || explicit === 'local') return explicit
@@ -43,16 +59,29 @@ export const config = {
   bindHost:
     process.env.AGENTS_OBSERVE_BIND_HOST ||
     (detectRuntime() === 'docker' ? '0.0.0.0' : '127.0.0.1'),
+  // CORS allowlist. Empty → reflect loopback origins only (same-machine
+  // dashboards; the client is served same-origin so this covers normal
+  // use). `*` → allow any origin (opt-in). Otherwise an explicit
+  // comma-separated allowlist.
+  corsAllowedOrigins: (process.env.AGENTS_OBSERVE_CORS_ORIGINS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
   logLevel,
   verbose: logLevel === 'debug' || logLevel === 'trace',
   dbPath: resolve(process.env.AGENTS_OBSERVE_DB_PATH || '../../data/observe.db'),
-  // Directory for persistent server state outside the SQLite DB —
-  // currently just the models.dev pricing cache. Defaults to the same
-  // directory as the DB so docker volume mounts cover both.
-  dataDir: resolve(
-    process.env.AGENTS_OBSERVE_DATA_DIR ||
-      dirname(resolve(process.env.AGENTS_OBSERVE_DB_PATH || '../../data/observe.db')),
+  // Host-side bind mount target for the DB. Set by the CLI when starting
+  // the docker container so the dashboard can show the user where the DB
+  // lives on their machine rather than the in-container `/data/observe.db`.
+  // Falls back to `dbPath` in local mode (where they're already the same).
+  hostDbPath: resolveHostDbPath(
+    process.env.AGENTS_OBSERVE_HOST_DB_PATH,
+    process.env.AGENTS_OBSERVE_DB_PATH,
   ),
+  // Directory for persistent server state outside the SQLite DB —
+  // currently just the models.dev pricing cache. Derived from dbPath so
+  // the docker volume mount covers both files.
+  dataDir: dirname(resolve(process.env.AGENTS_OBSERVE_DB_PATH || '../../data/observe.db')),
   storageAdapter: process.env.AGENTS_OBSERVE_STORAGE_ADAPTER || 'sqlite',
   clientDistPath: process.env.AGENTS_OBSERVE_CLIENT_DIST_PATH || '',
   devClientPort: parseInt(process.env.AGENTS_OBSERVE_DEV_CLIENT_PORT || '5174', 10),

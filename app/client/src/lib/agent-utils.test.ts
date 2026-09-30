@@ -4,6 +4,8 @@ import {
   buildAgentColorMap,
   getAgentColor,
   getAgentColorById,
+  isBackgroundLane,
+  orderAgentLanes,
 } from './agent-utils'
 import type { Agent } from '@/types'
 
@@ -152,5 +154,68 @@ describe('getAgentColorById', () => {
     const map = new Map<string, number>()
     const color = getAgentColorById('unknown-agent', map)
     expect(color).toEqual(getAgentColor(0))
+  })
+})
+
+describe('background lane', () => {
+  const lane = makeAgent({
+    id: 'sess-1:background',
+    parentAgentId: null,
+    name: 'Background',
+    agentType: 'background',
+  })
+
+  it('recognises a lane id', () => {
+    expect(isBackgroundLane('sess-1:background')).toBe(true)
+    expect(isBackgroundLane('sess-1')).toBe(false)
+    expect(isBackgroundLane('a356a5359c2963201')).toBe(false)
+  })
+
+  it('labels the lane instead of falling through to "Main"', () => {
+    // The lane has no parentAgentId, so the root-agent rule would
+    // otherwise claim it.
+    expect(getAgentDisplayName(lane)).toBe('Background')
+  })
+
+  it('labels a lane whose name never arrived', () => {
+    expect(getAgentDisplayName({ ...lane, name: null })).toBe('Background')
+  })
+})
+
+describe('orderAgentLanes', () => {
+  const main = makeAgent({ id: 'sess-1', parentAgentId: null })
+  const lane = makeAgent({ id: 'sess-1:background', parentAgentId: null, name: 'Background' })
+  const subA = makeAgent({ id: 'sub-a', parentAgentId: 'sess-1' })
+  const subB = makeAgent({ id: 'sub-b', parentAgentId: 'sess-1' })
+
+  it('pins the background lane directly after Main', () => {
+    const ordered = orderAgentLanes([subA, lane, main, subB], [])
+    expect(ordered.map((o) => o.agent.id)).toEqual([
+      'sess-1',
+      'sess-1:background',
+      'sub-b',
+      'sub-a',
+    ])
+  })
+
+  it('keeps subagents newest-first after the lane', () => {
+    const ordered = orderAgentLanes([main, subA, subB], [])
+    expect(ordered.map((o) => o.agent.id)).toEqual(['sess-1', 'sub-b', 'sub-a'])
+  })
+
+  it('marks the lane as neither main nor subagent styling', () => {
+    const ordered = orderAgentLanes([main, lane], [])
+    expect(ordered.find((o) => o.agent.id === 'sess-1:background')!.isSubagent).toBe(true)
+    expect(ordered.find((o) => o.agent.id === 'sess-1')!.isSubagent).toBe(false)
+  })
+
+  it('honours an explicit agent selection', () => {
+    const ordered = orderAgentLanes([main, lane, subA], ['sub-a'])
+    expect(ordered.map((o) => o.agent.id)).toEqual(['sub-a'])
+  })
+
+  it('still places the lane after Main when Main is absent', () => {
+    const ordered = orderAgentLanes([subA, lane], [])
+    expect(ordered.map((o) => o.agent.id)).toEqual(['sess-1:background', 'sub-a'])
   })
 })

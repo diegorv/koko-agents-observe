@@ -18,9 +18,14 @@
   "dependencies": {
     "@hono/node-server": "^2.0.4",
     "@types/ws": "^8.18.1",
-    "better-sqlite3": "^12.10.0",
+    "better-sqlite3": "^12.11.1",
     "hono": "^4.12.23",
     "re2js": "^2.8.3",
     "ws": "^8.21.0"
+  },
+  "allowScripts": {
+    "better-sqlite3@12.11.1": true,
+    "esbuild@0.27.4": true,
+    "fsevents@2.3.3": true
   }
 }

@@ -17,7 +17,10 @@ services:
       AGENTS_OBSERVE_CLIENT_DIST_PATH: /app/client/dist
       AGENTS_OBSERVE_LOG_LEVEL: "${AGENTS_OBSERVE_LOG_LEVEL:-debug}"
       AGENTS_OBSERVE_RUNTIME: docker
+    # Publish on loopback by default so the unauthenticated dashboard/WS is
+    # not exposed beyond this machine (issue #22). Set AGENTS_OBSERVE_BIND
+    # to 0.0.0.0 for LAN access.
     ports:
-      - "${AGENTS_OBSERVE_SERVER_PORT:-4981}:${AGENTS_OBSERVE_SERVER_PORT:-4981}"
+      - "${AGENTS_OBSERVE_BIND:-127.0.0.1}:${AGENTS_OBSERVE_SERVER_PORT:-4981}:${AGENTS_OBSERVE_SERVER_PORT:-4981}"
     volumes:
-      - ${AGENTS_OBSERVE_DATA_DIR:-./data}:/data
+      - ./data:/data

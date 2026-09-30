@@ -168,6 +168,18 @@ describe('session routes — agentClasses response shape', () => {
     expect(body[0].agentClasses).toEqual([])
   })
 
+  test('GET /api/sessions/recent forwards a numeric ?since to the store as the window cutoff', async () => {
+    mockStore.getRecentSessions.mockResolvedValue([])
+    await app.request('/api/sessions/recent?limit=200&since=1700000000000')
+    expect(mockStore.getRecentSessions).toHaveBeenCalledWith(200, 1700000000000)
+  })
+
+  test('GET /api/sessions/recent ignores a non-numeric ?since (no window)', async () => {
+    mockStore.getRecentSessions.mockResolvedValue([])
+    await app.request('/api/sessions/recent?since=notanumber')
+    expect(mockStore.getRecentSessions).toHaveBeenCalledWith(20, undefined)
+  })
+
   test('GET /api/sessions/:id splits comma-joined agent_classes into an array', async () => {
     mockStore.getSessionById.mockResolvedValue({
       id: 'sess1',

@@ -90,7 +90,10 @@ router.get('/sessions/recent', async (c) => {
   const store = c.get('store')
   const parsed = parsePositiveIntParam(c.req.query('limit'), 'limit', { defaultValue: 20 })
   if (!parsed.ok) return apiError(c, 400, parsed.reason)
-  const rows = await store.getRecentSessions(parsed.value ?? 20)
+  // Optional activity window: only sessions with last activity >= since (ms).
+  const sinceRaw = c.req.query('since') ? parseInt(c.req.query('since')!) : NaN
+  const since = Number.isFinite(sinceRaw) ? sinceRaw : undefined
+  const rows = await store.getRecentSessions(parsed.value ?? 20, since)
   return c.json(rows.map(rowToRecentSession))
 })
 

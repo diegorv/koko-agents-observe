@@ -2,6 +2,12 @@
 
 import Database from 'better-sqlite3'
 import { dirname } from 'node:path'
+import {
+  BACKGROUND_LANE_SUFFIX,
+  BACKGROUND_LANE_NAME,
+  BACKGROUND_LANE_TYPE,
+  BACKGROUND_LANE_DESCRIPTION,
+} from '../services/background-tick'
 import type {
   AgentPatch,
   EventStore,
@@ -445,6 +451,100 @@ export class SqliteAdapter implements EventStore {
     this.db.exec(
       'CREATE INDEX IF NOT EXISTS idx_sessions_transcript_path ON sessions(transcript_path)',
     )
+
+    this.migrateBackgroundTicks()
+  }
+
+  /**
+   * Collapse historical background poll ticks onto one lane per session.
+   *
+   * Before this migration every ~31s tick (see services/background-tick.ts)
+   * landed as its own single-event agent row — on a long-lived install that
+   * was ~95% of the agents table, and one timeline row apiece. Ticks are
+   * reattributed to `<session_id>:background`; the per-tick agent rows, now
+   * owning no events, are deleted. No event row is ever removed, and each
+   * tick's original id survives in its payload's `agent_id`.
+   *
+   * There is no versioned migration system here, so this runs on every open
+   * and must stay idempotent: a reattributed tick no longer matches the
+   * phantom predicate (its agent_id has become the lane id), so a second
+   * pass finds nothing. The predicate is probed with a LIMIT 1 first so a
+   * migrated database pays one indexless lookup rather than a full rewrite.
+   */
+  private migrateBackgroundTicks(): void {
+    // A tick is a SubagentStop that names no agent_type and was never opened
+    // by a SubagentStart. Rows whose payload is not valid JSON are left
+    // alone rather than guessed at. `?` is the lane suffix.
+    const phantomWhere = `
+      e.hook_name = 'SubagentStop'
+      AND json_valid(e.payload)
+      AND TRIM(COALESCE(json_extract(e.payload, '$.agent_type'), '')) = ''
+      AND e.agent_id <> e.session_id || ?
+      AND e.agent_id NOT IN (
+        SELECT s.agent_id FROM events s WHERE s.hook_name = 'SubagentStart'
+      )
+    `
+    const suffix = BACKGROUND_LANE_SUFFIX
+
+    const probe = this.db
+      .prepare(`SELECT 1 FROM events e WHERE ${phantomWhere} LIMIT 1`)
+      .get(suffix)
+    if (!probe) return
+
+    const phantomIds = (
+      this.db
+        .prepare(`SELECT DISTINCT e.agent_id AS id FROM events e WHERE ${phantomWhere}`)
+        .all(suffix) as { id: string }[]
+    ).map((r) => r.id)
+
+    const now = Date.now()
+    const migrate = this.db.transaction(() => {
+      // Lane rows first: events.agent_id carries a foreign key to agents(id),
+      // so the target must exist before the reattribution lands.
+      this.db
+        .prepare(
+          `
+          INSERT OR IGNORE INTO agents
+            (id, agent_class, name, description, agent_type, created_at, updated_at)
+          SELECT DISTINCT
+            e.session_id || ?,
+            COALESCE((SELECT a.agent_class FROM agents a WHERE a.id = e.agent_id), 'unknown'),
+            ?, ?, ?, ?, ?
+          FROM events e
+          WHERE ${phantomWhere}
+        `,
+        )
+        .run(
+          suffix,
+          BACKGROUND_LANE_NAME,
+          BACKGROUND_LANE_DESCRIPTION,
+          BACKGROUND_LANE_TYPE,
+          now,
+          now,
+          suffix,
+        )
+
+      this.db
+        .prepare(
+          `
+          UPDATE events SET agent_id = session_id || ?
+          WHERE id IN (SELECT e.id FROM events e WHERE ${phantomWhere})
+        `,
+        )
+        .run(suffix, suffix)
+
+      // Only the ids just emptied, and only if truly event-free — never a
+      // blanket sweep of every agent row that happens to have no events.
+      const deleteOrphan = this.db.prepare(
+        'DELETE FROM agents WHERE id = ? AND NOT EXISTS (SELECT 1 FROM events WHERE agent_id = ?)',
+      )
+      for (const id of phantomIds) deleteOrphan.run(id, id)
+    })
+    migrate()
+
+    console.log(
+      `[migration] collapsed background poll ticks from ${phantomIds.length} phantom agent(s) onto per-session lanes`,
+    )
   }
 
   async createProject(slug: string, name: string): Promise<number> {
@@ -471,8 +571,7 @@ export class SqliteAdapter implements EventStore {
 
   async isSlugAvailable(slug: string): Promise<boolean> {
     const row = this.db.prepare(`SELECT id FROM projects WHERE slug = ?`).get(slug) as
-      | { id: number }
-      | undefined
+      { id: number } | undefined
     return row === undefined
   }
 
@@ -490,14 +589,12 @@ export class SqliteAdapter implements EventStore {
       .run(slug, name ?? slug, now, now)
     const created = insertResult.changes === 1
     let row = this.db.prepare('SELECT id, slug FROM projects WHERE slug = ?').get(slug) as
-      | { id: number; slug: string }
-      | undefined
+      { id: number; slug: string } | undefined
     if (!row) {
       // Defensive retry — SQLite serializes writes so this is unreachable
       // in practice. Retry once before giving up.
       row = this.db.prepare('SELECT id, slug FROM projects WHERE slug = ?').get(slug) as
-        | { id: number; slug: string }
-        | undefined
+        { id: number; slug: string } | undefined
       if (!row) throw new Error(`findOrCreateProjectBySlug: slug ${slug} disappeared`)
     }
     return { id: row.id, slug: row.slug, created }
@@ -534,8 +631,7 @@ export class SqliteAdapter implements EventStore {
          LIMIT 1`,
       )
       .get(excludeSessionId, startCwd, startCwd, basedirPrefix, basedirPrefix) as
-      | { project_id: number }
-      | undefined
+      { project_id: number } | undefined
     return row ? { projectId: row.project_id } : null
   }
 
@@ -897,8 +993,7 @@ export class SqliteAdapter implements EventStore {
 
   async getFilterById(id: string): Promise<Filter | null> {
     const row = this.db.prepare('SELECT * FROM filters WHERE id = ?').get(id) as
-      | FilterRow
-      | undefined
+      FilterRow | undefined
     return row ? this.rowToFilter(row) : null
   }
 
@@ -1270,11 +1365,18 @@ export class SqliteAdapter implements EventStore {
     return { events, agents }
   }
 
-  async getRecentSessions(limit: number = 20): Promise<any[]> {
+  async getRecentSessions(limit: number = 20, since?: number): Promise<any[]> {
     // LEFT JOIN so orphaned sessions (project deleted out from under them)
     // still appear in the recent list. The repairOrphans pass should make
     // this rare, but the LEFT JOIN is defensive — without it, an orphaned
     // active session would silently disappear from the UI.
+    //
+    // `since` (epoch ms) bounds the result to a recent activity window — the
+    // Constellation dashboard uses it so only sessions active within the
+    // window appear. Filters on the same COALESCE expression the list is
+    // ordered by, so the cutoff matches "last activity".
+    const whereClause = since != null ? 'WHERE COALESCE(s.last_activity, s.started_at) >= ?' : ''
+    const params = since != null ? [since, limit] : [limit]
     return this.db
       .prepare(
         `
@@ -1291,11 +1393,12 @@ export class SqliteAdapter implements EventStore {
         ) AS agent_classes
       FROM sessions s
       LEFT JOIN projects p ON p.id = s.project_id
+      ${whereClause}
       ORDER BY COALESCE(s.last_activity, s.started_at) DESC
       LIMIT ?
     `,
       )
-      .all(limit)
+      .all(...params)
   }
 
   async getUnassignedSessions(limit: number = 100): Promise<any[]> {

@@ -85,6 +85,75 @@ Focused on backend robustness with defensive fixes across the API server, WebSoc
 - CI: configure Dependabot for npm (root, `app/server`, `app/client`), Docker, and GitHub Actions; previous config shipped with an empty `package-ecosystem` and monitored nothing. Guard test fails if the stub regresses.
 - Docs: add `docs/audit-report.html`, a self-contained static report of the read-only audit that produced this release.
 - Tests: 23 new tests across server, client, and scripts (now 802 total) covering the helpers and regression cases for every fix above.
+## v0.9.12 — Security hardening and cross-platform fixes
+
+This release tightens default security by binding the server to loopback, restricting CORS, and rejecting cross-origin WebSocket connections. It also fixes running the dashboard on Windows and SELinux hosts, and improves structured output summaries.
+
+### Breaking Changes
+
+The server now binds to loopback (localhost) and restricts CORS by default, so the dashboard is no longer reachable from other machines or cross-origin pages out of the box. If you access the dashboard remotely or from a different origin, you'll need to explicitly configure the server's host binding and allowed origins to opt back in.
+
+### Features
+
+- Structured output summaries now include the field name for clearer context.
+
+### Fixes
+
+- Bind the server to loopback and restrict CORS by default to prevent unwanted network access.
+- Reject cross-origin WebSocket connections.
+- Correctly mount transcript directories on Windows and fix the health check's database path.
+- Relabel Docker bind mounts on SELinux hosts so containers can access them.
+- Render the agent combobox and session icons on unassigned sessions.
+
+### Other
+
+- Hardened the test suite (hermetic hook-autostart test, localStorage polyfill for jsdom on Node 26).
+- Bumped better-sqlite3 and applied Prettier formatting across the codebase.
+
+## v0.9.11 — NEW Constellation dashboard, Hermes agent support, and richer conversation threads
+
+This release introduces the fun new Constellation UI home-page view — an activity bubble visualization. It adds first-class support for Hermes agents, including dedicated event rendering, session stats, and model pricing, alongside a redesigned collapsible conversation thread with navigation and stable scrolling.
+
+### Features
+
+- Added the Constellation dashboard theme; it's now the default home-page view with a toggle to switch to previous List view.
+- Added first-class Hermes agent support: dedicated event rendering, session stats derived from events, a model pricing endpoint, and a Hermes agent plugin.
+- Redesigned the conversation thread to be collapsible with thread navigation, stable stream scrolling, and improved parity with the event stream.
+- Added rendering for claude's StructuredOutput tool events.
+- Added positional URL routing with a project segment derived from the session.
+- Made the active-session indicator duration configurable.
+
+### Fixes
+
+- Normalized epoch-seconds timestamps to milliseconds at ingest so event times display correctly.
+
+### Other
+
+- Improved routing performance by caching session lookups and bounding the route fallback set.
+
+## v0.9.10 — Subagent token attribution and Workflow event tracking
+
+This release adds token cost attribution for subagents and workflows, so the tokens they consume are now traced back to the prompt that triggered them. It also improves Workflow tool tracking by correctly pairing pre- and post-execution events and rendering their details in the dashboard.
+
+### Features
+
+- Subagent and workflow token costs are now attributed to the originating prompt, giving you accurate per-prompt cost breakdowns.
+
+## v0.9.9 — Stable database location across plugin upgrades
+
+This release keeps your event database in a stable location so it survives plugin upgrades, with expanded scanning to automatically migrate databases from older layouts. The dashboard now shows the host bind mount path, and the `/observe logs` command has been split into separate server, CLI, and MCP log views.
+
+Set `AGENTS_OBSERVE_LOCAL_DATA_ROOT` in `~/.claude/settings.json` to manually pin the location of the db if needed. See [README.md](https://github.com/simple10/agents-observe#data-location) for details.
+
+### Features
+
+- The database is now stored in a stable location that persists across plugin upgrades, with automatic detection and migration of databases from all previous layouts.
+- The dashboard Settings now displays the host bind mount path for the database.
+- `/observe logs` now splits output into separate `logs-server`, `logs-cli`, and `logs-mcp` views for easier troubleshooting.
+
+### Fixes
+
+- Event data is no longer lost when upgrading the plugin (#17).
 
 ## v0.9.8 — Improvements to session transcript stats
 

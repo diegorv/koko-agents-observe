@@ -39,13 +39,12 @@ import { useEffectiveEvents } from '@/hooks/use-effective-events'
 import { useAgents } from '@/hooks/use-agents'
 import { useProcessedEvents } from '@/agents/event-processing-context'
 import { useSessions } from '@/hooks/use-sessions'
-import { buildAgentColorMap, getAgentColorById } from '@/lib/agent-utils'
+import { buildAgentColorMap, getAgentColorById, orderAgentLanes } from '@/lib/agent-utils'
 import { AgentLane } from './agent-lane'
 import { TimelineRewind } from './timeline-rewind'
 import { Button } from '@/components/ui/button'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { Rewind, Play } from 'lucide-react'
-import type { Agent } from '@/types'
 import type { EnrichedEvent } from '@/agents/types'
 
 export function ActivityTimeline() {
@@ -106,21 +105,10 @@ export function ActivityTimeline() {
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [])
 
-  const flatAgents = useMemo(() => {
-    const mainAgents: { agent: Agent; isSubagent: boolean }[] = []
-    const nonMainAgents: { agent: Agent; isSubagent: boolean }[] = []
-    for (const a of agents) {
-      if (selectedAgentIds.length > 0 && !selectedAgentIds.includes(a.id)) continue
-      if (!a.parentAgentId) {
-        mainAgents.push({ agent: a, isSubagent: false })
-      } else {
-        nonMainAgents.push({ agent: a, isSubagent: true })
-      }
-    }
-    // Reverse non-main agents so newest appear right after Main
-    nonMainAgents.reverse()
-    return [...mainAgents, ...nonMainAgents]
-  }, [agents, selectedAgentIds])
+  const flatAgents = useMemo(
+    () => orderAgentLanes(agents, selectedAgentIds),
+    [agents, selectedAgentIds],
+  )
 
   const agentColorMap = useMemo(() => buildAgentColorMap(agents), [agents])
 
@@ -147,7 +135,8 @@ export function ActivityTimeline() {
       const onMouseMove = (e: MouseEvent) => {
         if (!resizing.current) return
         const delta = e.clientY - startY.current
-        const newHeight = Math.max(60, Math.min(400, startHeight.current + delta))
+        const maxHeight = window.innerHeight * 0.8
+        const newHeight = Math.max(60, Math.min(maxHeight, startHeight.current + delta))
         // Update DOM directly during drag to avoid React re-renders
         if (containerRef.current) {
           containerRef.current.style.height = `${newHeight}px`
@@ -159,7 +148,8 @@ export function ActivityTimeline() {
       const onMouseUp = (e: MouseEvent) => {
         resizing.current = false
         const delta = e.clientY - startY.current
-        const finalHeight = Math.max(60, Math.min(400, startHeight.current + delta))
+        const maxHeight = window.innerHeight * 0.8
+        const finalHeight = Math.max(60, Math.min(maxHeight, startHeight.current + delta))
         // Commit final height to React state
         setTimelineHeight(finalHeight)
         document.removeEventListener('mousemove', onMouseMove)

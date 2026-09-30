@@ -182,6 +182,20 @@ describe('SqliteAdapter — projects', () => {
     expect(recent[0].project_slug).toBe('proj1')
     expect(recent[0].project_name).toBe('Project One')
   })
+
+  test('getRecentSessions(limit, since) returns only sessions active at/after the cutoff', async () => {
+    const projId = await store.createProject('proj1', 'Project One')
+    await store.upsertSession('old', projId, null, null, 1000)
+    await store.upsertSession('edge', projId, null, null, 3000)
+    await store.upsertSession('new', projId, null, null, 5000)
+
+    const windowed = await store.getRecentSessions(20, 3000)
+    expect(windowed.map((r) => r.id)).toEqual(['new', 'edge']) // newest first, 'old' excluded
+
+    // No `since` → unfiltered (all three).
+    const all = await store.getRecentSessions(20)
+    expect(all).toHaveLength(3)
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -1716,5 +1730,138 @@ describe('signature_hash migration + dedup', () => {
     })
     expect(await store.findEventBySignatureHash('lookup-me')).toEqual({ id: eventId })
     expect(await store.findEventBySignatureHash('not-here')).toBeNull()
+  })
+})
+
+describe('background poll tick migration', () => {
+  // Builds a DB in the pre-migration shape: phantom SubagentStop events, each
+  // owning its own single-event agent row, alongside one real subagent.
+  function seedLegacy(path: string) {
+    const raw = new Database(path)
+    raw.exec(`
+      CREATE TABLE agents (
+        id TEXT PRIMARY KEY, agent_class TEXT NOT NULL DEFAULT 'unknown',
+        name TEXT, description TEXT, agent_type TEXT,
+        created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+      );
+      CREATE TABLE events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        agent_id TEXT NOT NULL, session_id TEXT NOT NULL, hook_name TEXT NOT NULL,
+        timestamp INTEGER NOT NULL, created_at INTEGER NOT NULL,
+        cwd TEXT, _meta TEXT, payload TEXT NOT NULL, signature_hash TEXT
+      );
+    `)
+    const agent = raw.prepare(
+      'INSERT INTO agents (id, agent_class, agent_type, created_at, updated_at) VALUES (?,?,?,1,1)',
+    )
+    const event = raw.prepare(
+      'INSERT INTO events (agent_id, session_id, hook_name, timestamp, created_at, payload) VALUES (?,?,?,?,1,?)',
+    )
+    // Three phantom ticks in sess-1, one in sess-2.
+    const ticks: Array<[string, string, number]> = [
+      ['af0cb6ca', 'sess-1', 1000],
+      ['a5a8bdf1', 'sess-1', 32000],
+      ['a264b2f3', 'sess-1', 63000],
+      ['a9ff1eae', 'sess-2', 1000],
+    ]
+    for (const [id, session, ts] of ticks) {
+      agent.run(id, 'claude-code', null)
+      event.run(id, session, 'SubagentStop', ts, JSON.stringify({ agent_type: '', agent_id: id }))
+    }
+    // A real subagent: SubagentStart + a typed SubagentStop + a tool call.
+    agent.run('a356a535', 'claude-code', 'general-purpose')
+    event.run('a356a535', 'sess-1', 'SubagentStart', 900, '{}')
+    event.run('a356a535', 'sess-1', 'PreToolUse', 950, '{"tool_name":"Bash"}')
+    event.run(
+      'a356a535',
+      'sess-1',
+      'SubagentStop',
+      990,
+      JSON.stringify({ agent_type: 'general-purpose' }),
+    )
+    // The main agent, plus an agent that is legitimately empty of stops.
+    agent.run('sess-1', 'claude-code', null)
+    event.run('sess-1', 'sess-1', 'UserPromptSubmit', 800, '{}')
+    raw.close()
+  }
+
+  function withMigrated<T>(fn: (db: Database.Database) => T): T {
+    const path = `${tmpdir()}/bgtick-mig-${Date.now()}-${Math.random()}.db`
+    seedLegacy(path)
+    const adapter = new SqliteAdapter(path)
+    const db = (adapter as unknown as { db: Database.Database }).db
+    try {
+      return fn(db)
+    } finally {
+      unlinkSync(path)
+    }
+  }
+
+  test('reattributes phantom stops onto one lane per session', () => {
+    withMigrated((db) => {
+      const rows = db
+        .prepare("SELECT agent_id, session_id FROM events WHERE hook_name = 'SubagentStop'")
+        .all() as { agent_id: string; session_id: string }[]
+      const lanes = rows.filter((r) => r.agent_id.endsWith(':background'))
+      expect(lanes).toHaveLength(4)
+      expect(lanes.filter((r) => r.agent_id === 'sess-1:background')).toHaveLength(3)
+      expect(lanes.filter((r) => r.agent_id === 'sess-2:background')).toHaveLength(1)
+    })
+  })
+
+  test('creates a labelled agents row for each lane', () => {
+    withMigrated((db) => {
+      const lane = db.prepare("SELECT * FROM agents WHERE id = 'sess-1:background'").get() as {
+        name: string
+        agent_type: string
+      }
+      expect(lane).toBeDefined()
+      expect(lane.name).toBe('Background')
+      expect(lane.agent_type).toBe('background')
+    })
+  })
+
+  test('deletes the orphaned per-tick agent rows', () => {
+    withMigrated((db) => {
+      for (const id of ['af0cb6ca', 'a5a8bdf1', 'a264b2f3', 'a9ff1eae']) {
+        expect(db.prepare('SELECT id FROM agents WHERE id = ?').get(id)).toBeUndefined()
+      }
+    })
+  })
+
+  test('leaves the real subagent and the main agent untouched', () => {
+    withMigrated((db) => {
+      expect(db.prepare("SELECT id FROM agents WHERE id = 'a356a535'").get()).toBeDefined()
+      expect(db.prepare("SELECT id FROM agents WHERE id = 'sess-1'").get()).toBeDefined()
+      const real = db
+        .prepare("SELECT agent_id FROM events WHERE agent_id = 'a356a535'")
+        .all() as unknown[]
+      expect(real).toHaveLength(3)
+    })
+  })
+
+  test('preserves every event row — nothing is deleted', () => {
+    withMigrated((db) => {
+      const { n } = db.prepare('SELECT COUNT(*) n FROM events').get() as { n: number }
+      expect(n).toBe(8)
+    })
+  })
+
+  test('is idempotent across repeated opens', () => {
+    const path = `${tmpdir()}/bgtick-idem-${Date.now()}-${Math.random()}.db`
+    seedLegacy(path)
+    new SqliteAdapter(path)
+    const second = new SqliteAdapter(path)
+    const db = (second as unknown as { db: Database.Database }).db
+    const { n } = db.prepare('SELECT COUNT(*) n FROM events').get() as { n: number }
+    expect(n).toBe(8)
+    const agents = db.prepare('SELECT id FROM agents ORDER BY id').all() as { id: string }[]
+    expect(agents.map((a) => a.id)).toEqual([
+      'a356a535',
+      'sess-1',
+      'sess-1:background',
+      'sess-2:background',
+    ])
+    unlinkSync(path)
   })
 })

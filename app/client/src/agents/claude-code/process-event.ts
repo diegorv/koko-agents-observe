@@ -1,11 +1,14 @@
 import type { RawEvent, ProcessingContext } from '../types'
 import type { ClaudeCodeEnrichedEvent } from './types'
 import { EVENT_ICON_REGISTRY } from '@/lib/event-icon-registry'
-import { getEventSummary, buildSearchText } from './helpers'
+import { getEventSummary, buildSearchText, isWeakSummary, truncate } from './helpers'
 import { deriveToolName } from './derivers'
 import { agentPatchDebouncer } from '@/lib/agent-patch-debouncer'
 import { applyFilters } from '@/lib/filters/matcher'
 import { passesAllFilter } from '@/lib/filters/all-filter'
+
+/** Cap on a failure error promoted into a row summary — errors can be long. */
+const SUMMARY_MAX = 200
 
 /** Map (hookName, toolName) → registry icon id. Tool icons are prefixed
  *  `Tool` to disambiguate from hookName-shaped ids. */
@@ -24,6 +27,7 @@ function pickIconId(hookName: string, toolName: string | null): string {
       WebSearch: 'ToolWebSearch',
       WebFetch: 'ToolWebFetch',
       Agent: 'ToolAgent',
+      StructuredOutput: 'ToolStructuredOutput',
     }
     return map[toolName ?? ''] ?? 'ToolDefault'
   }
@@ -86,8 +90,7 @@ const LABELS: Record<string, string> = {
  */
 function diffAgentPatch(
   current:
-    | { name?: string | null; description?: string | null; agentType?: string | null }
-    | undefined,
+    { name?: string | null; description?: string | null; agentType?: string | null } | undefined,
   proposed: { name?: string | null; description?: string | null; agent_type?: string | null },
 ): { name?: string | null; description?: string | null; agent_type?: string | null } | null {
   const patch: { name?: string | null; description?: string | null; agent_type?: string | null } =
@@ -238,10 +241,15 @@ export function processEvent(
   let statusOverride: ClaudeCodeEnrichedEvent['status'] | null = null
 
   if (dedup) {
-    // Task grouping
-    const taskId = (p.task_id ?? p.tool_input?.taskId ?? p.tool_response?.taskId) as
-      | string
-      | undefined
+    // Task grouping. The tool_input/tool_response taskId only counts for
+    // Task-lifecycle tools — other tools (e.g. Workflow, which returns a
+    // background `taskId` in its response) must NOT be hijacked into a
+    // task group, or their Pre/Post pair never reunites under the shared
+    // tool_use_id below. `task_id` is only emitted by Task* hooks.
+    const isTaskTool = toolName === 'TaskCreate' || toolName === 'TaskUpdate'
+    const taskId = (p.task_id ??
+      (isTaskTool ? (p.tool_input?.taskId ?? p.tool_response?.taskId) : undefined)) as
+      string | undefined
     if (taskId) {
       groupId = `task-${taskId}`
     }
@@ -310,11 +318,22 @@ export function processEvent(
           payload: { ...preEvent.payload, ...p },
         }
         const refreshedFilters = applyFilters(mergedRaw, preEvent.toolName, ctx.compiledFilters)
-        ctx.updateEvent(preEvent.id, {
+        const patch: Parameters<typeof ctx.updateEvent>[1] = {
           status: newStatus,
           searchText: preEvent.searchText + ' ' + (resultText?.toLowerCase() ?? ''),
           filters: refreshedFilters,
-        })
+        }
+        // A failure folds onto the Pre row, whose summary was computed before
+        // the error existed. When that summary carries no real information,
+        // surface the error so the row isn't blank. getEventSummary's
+        // PostToolUseFailure path is already error-first.
+        if (hookName === 'PostToolUseFailure' && isWeakSummary(preEvent.summary)) {
+          const failSummary = getEventSummary(mergedRaw, hookName, preEvent.toolName)
+          if (failSummary && !isWeakSummary(failSummary)) {
+            patch.summary = truncate(failSummary, SUMMARY_MAX)
+          }
+        }
+        ctx.updateEvent(preEvent.id, patch)
       }
     }
 
