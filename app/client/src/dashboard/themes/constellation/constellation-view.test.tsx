@@ -94,6 +94,18 @@ describe('ConstellationView', () => {
     expect(screen.getByText('Deep Space')).toBeTruthy() // expanded again
   })
 
+  it('renders tooltip values as text, never as HTML', () => {
+    const payload = '<img src=x onerror="alert(1)">'
+    mockWindowed = { data: [session('evil', { projectName: payload })], isLoading: false }
+    const { container } = renderWithProviders(<ConstellationView {...props} />)
+
+    fireEvent.mouseMove(screen.getByText('evil').closest('g.cst-star')!)
+
+    const tooltip = container.querySelector('.cst-tooltip')!
+    expect(tooltip.querySelector('img')).toBeNull()
+    expect(tooltip.textContent).toContain(payload)
+  })
+
   it('sets the sidebar preview on focus and clears it on background click', () => {
     mockWindowed = { data: [session('swift-otter', { projectId: 7 })], isLoading: false }
     const { container } = renderWithProviders(<ConstellationView {...props} />)
