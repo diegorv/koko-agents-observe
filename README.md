@@ -96,8 +96,8 @@ By default, the SQLite DB and logs live under:
 
 - `$CLAUDE_PLUGIN_DATA` when running as a Claude plugin. Claude Code names this dir
   `<plugin>-<marketplace>` — so a marketplace install lands at
-  `~/.claude/plugins/data/agents-observe-agents-observe/`, and a `--plugin-dir`
-  install lands at `~/.claude/plugins/data/agents-observe-inline/`.
+  `~/.claude/plugins/data/koko-fork-agents-observe-koko-fork-agents-observe/`, and a
+  `--plugin-dir` install lands at `~/.claude/plugins/data/koko-fork-agents-observe-inline/`.
 - `~/.agents-observe/` when running outside Claude (Codex, manual CLI, dev).
 
 The DB sits at `<root>/data/observe.db`, logs at `<root>/logs/`.
