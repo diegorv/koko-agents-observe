@@ -25,6 +25,10 @@
   --c-dots: oklch(0.35 0 0 / 0.5);
   --c-ok: #4ade80;
   --c-stopped: #6b7280;
+  --c-stroke: 255 255 255; /* rgb channels for star/node outlines */
+  --c-btn: oklch(0.25 0 0);
+  --c-btn-hover: oklch(0.32 0 0);
+  --c-gear-hover: oklch(0.27 0 0);
 }
 
 .constellation[data-palette='space'] {
@@ -53,6 +57,31 @@
   --c-dots: rgba(94, 234, 212, 0.45);
   --c-ok: #5eead4;
   --c-stopped: #2f5d54;
+}
+
+/* native palette on the app's light theme. Deep Space and Bioluminescent are
+   dark by design and keep their own backgrounds. Star colors stay hex because
+   the render loop parses them with parseColor (hex/rgb only). */
+:root:not(.dark) .constellation[data-palette='native'] {
+  --c-bg: oklch(0.985 0 0);
+  --c-bg2: oklch(0.95 0.01 250);
+  --c-fg: oklch(0.205 0 0);
+  --c-muted: oklch(0.45 0 0);
+  --c-border: oklch(0.88 0 0);
+  --c-panel: oklch(1 0 0 / 0.9);
+  --c-cool: #94a3b8;
+  --c-warm: #d97706;
+  --c-hot: #ea580c;
+  --c-active-ring: #16a34a;
+  --c-attn: #d97706;
+  --c-edge: oklch(0.55 0 0 / 0.45);
+  --c-dots: oklch(0.6 0 0 / 0.4);
+  --c-ok: #16a34a;
+  --c-stopped: #9ca3af;
+  --c-stroke: 0 0 0;
+  --c-btn: oklch(0.96 0 0);
+  --c-btn-hover: oklch(0.92 0 0);
+  --c-gear-hover: oklch(0.93 0 0);
 }
 
 .constellation {
@@ -120,14 +149,14 @@
   opacity: 0.45;
 }
 .cst-sub {
-  stroke: rgba(255, 255, 255, 0.4);
+  stroke: rgb(var(--c-stroke) / 0.4);
   stroke-width: 0.5;
 }
 .cst-star {
   cursor: pointer;
 }
 .cst-core {
-  stroke: rgba(255, 255, 255, 0.55);
+  stroke: rgb(var(--c-stroke) / 0.55);
   stroke-width: 0.75;
 }
 .cst-label {
@@ -215,7 +244,7 @@
   stroke-width: 1.5;
 }
 .cst-tree-node {
-  stroke: rgba(255, 255, 255, 0.5);
+  stroke: rgb(var(--c-stroke) / 0.5);
   stroke-width: 1;
 }
 .cst-tree-label {
@@ -275,7 +304,7 @@
 }
 .cst-gear:hover {
   color: var(--c-fg);
-  background: oklch(0.27 0 0);
+  background: var(--c-gear-hover);
 }
 .cst-controls--collapsed .cst-gear {
   position: static;
@@ -329,14 +358,14 @@
   font: inherit;
   font-size: 12px;
   cursor: pointer;
-  background: oklch(0.25 0 0);
+  background: var(--c-btn);
   color: var(--c-fg);
   border: 1px solid var(--c-border);
   border-radius: 8px;
   padding: 5px 9px;
 }
 .cst-btn:hover {
-  background: oklch(0.32 0 0);
+  background: var(--c-btn-hover);
 }
 .cst-btn--on {
   border-color: var(--c-warm);

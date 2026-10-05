@@ -26,6 +26,7 @@ import {
   fmtDuration,
 } from './scale'
 import { Settings } from 'lucide-react'
+import { useTheme } from '@/components/theme-provider'
 import './constellation.css'
 
 const PALETTE_STORAGE_KEY = 'koko-agents-observe-constellation-palette'
@@ -108,6 +109,7 @@ export function ConstellationView({ onOpenSession }: DashboardThemeProps) {
   const [paletteId, setPaletteId] = useState(() =>
     resolvePaletteId(localStorage.getItem(PALETTE_STORAGE_KEY)),
   )
+  const { theme } = useTheme()
   const [reduced, setReduced] = useState(false)
   const [tau, setTau] = useState(90)
   const [focusedId, setFocusedId] = useState<string | null>(null)
@@ -315,21 +317,27 @@ export function ConstellationView({ onOpenSession }: DashboardThemeProps) {
     }
   }, [wells, worldBounds, camSize])
 
-  // Recompute cached palette RGBs whenever the palette changes.
+  // Recompute cached palette RGBs whenever the palette or app theme changes
+  // (the native palette has a light variant in constellation.css).
+  // Read on the next frame: ThemeProvider (a parent) toggles the <html> .dark
+  // class in its own effect, which runs after this one.
   useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
-    const cs = getComputedStyle(el)
-    const read = (name: string, fallback: RGB): RGB => {
-      const v = cs.getPropertyValue(name).trim()
-      return v ? parseColor(v) : fallback
-    }
-    paletteRgbRef.current = {
-      cool: read('--c-cool', DEFAULT_RGB.cool),
-      warm: read('--c-warm', DEFAULT_RGB.warm),
-      hot: read('--c-hot', DEFAULT_RGB.hot),
-    }
-  }, [paletteId])
+    const raf = requestAnimationFrame(() => {
+      const el = containerRef.current
+      if (!el) return
+      const cs = getComputedStyle(el)
+      const read = (name: string, fallback: RGB): RGB => {
+        const v = cs.getPropertyValue(name).trim()
+        return v ? parseColor(v) : fallback
+      }
+      paletteRgbRef.current = {
+        cool: read('--c-cool', DEFAULT_RGB.cool),
+        warm: read('--c-warm', DEFAULT_RGB.warm),
+        hot: read('--c-hot', DEFAULT_RGB.hot),
+      }
+    })
+    return () => cancelAnimationFrame(raf)
+  }, [paletteId, theme])
 
   const registerNode = useCallback((id: string, g: SVGGElement | null) => {
     if (!g) {
