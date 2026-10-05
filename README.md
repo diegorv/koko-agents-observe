@@ -44,7 +44,7 @@ claude
 # Use the /observe skill in claude to check status, restart the server, etc.
 > /observe status
 > /observe debug
-> /observe logs
+> /observe logs-server
 > /observe restart
 
 # Open the dashboard UI in a browser
@@ -103,7 +103,7 @@ Use the `/observe debug` claude command to help troubleshoot and fix installatio
 | `/observe start` | Start the server |
 | `/observe stop` | Stop the server |
 | `/observe restart` | Restart the server (stops and recreates the container) |
-| `/observe logs` | Show recent Docker container logs |
+| `/observe logs-server` | Show recent Docker container logs |
 | `/observe debug` | Diagnose server issues (health, docker logs, mcp.log, cli.log) |
 
 ## Why observability matters

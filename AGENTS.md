@@ -22,7 +22,7 @@ Restart Claude Code. The server auto-starts as a Docker container and the dashbo
 | `/observe start` | Start the server |
 | `/observe stop` | Stop the server |
 | `/observe restart` | Restart the server |
-| `/observe logs` | Show recent container logs |
+| `/observe logs-server` | Show recent container logs |
 | `/observe debug` | Diagnose server issues |
 
 ## Clone & Run
