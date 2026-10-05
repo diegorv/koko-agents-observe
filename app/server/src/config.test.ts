@@ -64,3 +64,17 @@ describe('config.bindHost default', () => {
     ).toBe('192.168.1.5')
   })
 })
+
+describe('config.shutdownDelayMs default', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.resetModules()
+  })
+
+  test('defaults to 30 minutes when unset', async () => {
+    vi.stubEnv('AGENTS_OBSERVE_SHUTDOWN_DELAY_MS', '')
+    vi.resetModules()
+    const { config } = await import('./config')
+    expect(config.shutdownDelayMs).toBe(1_800_000)
+  })
+})

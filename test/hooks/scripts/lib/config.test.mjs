@@ -27,6 +27,7 @@ const envKeys = [
   'AGENTS_OBSERVE_BIND',
   'AGENTS_OBSERVE_CORS_ORIGINS',
   'AGENTS_OBSERVE_SELINUX_RELABEL',
+  'AGENTS_OBSERVE_SHUTDOWN_DELAY_MS',
 ]
 
 let savedEnv
@@ -391,6 +392,19 @@ describe('config', () => {
   it('sets hasCustomApiUrl true when baseUrl override is provided', async () => {
     const cfg = await loadConfig({ baseUrl: 'http://override:8888/api' })
     expect(cfg.hasCustomApiUrl).toBe(true)
+  })
+
+  // --- shutdownDelayMs ---
+
+  it('defaults shutdownDelayMs to 30 minutes', async () => {
+    const cfg = await loadConfig()
+    expect(cfg.shutdownDelayMs).toBe(1800000)
+  })
+
+  it('reads AGENTS_OBSERVE_SHUTDOWN_DELAY_MS', async () => {
+    process.env.AGENTS_OBSERVE_SHUTDOWN_DELAY_MS = '30000'
+    const cfg = await loadConfig()
+    expect(cfg.shutdownDelayMs).toBe(30000)
   })
 
   // --- hookStartupTimeout ---
