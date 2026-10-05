@@ -1,7 +1,6 @@
 import { useUIStore } from '@/stores/ui-store'
 import { Button } from '@/components/ui/button'
 import { LogsModal } from './logs-modal'
-import { AgentCombobox } from './agent-combobox'
 import { ArrowDownToLine, SquarePen, BarChart3, ChevronsDownUp, ChevronsUpDown } from 'lucide-react'
 
 export function ScopeBar() {
@@ -13,18 +12,18 @@ export function ScopeBar() {
     collapseAllEvents,
     requestExpandAll,
     setEditingSessionId,
+    dedupEnabled,
+    openSettings,
   } = useUIStore()
 
   // Only a selected session is required. Unassigned sessions route as
   // `#/_/<sessionId>` with no project, so selectedProjectId is null — gating
-  // on it here hid the whole bar (agent combobox + session icons) on those
+  // on it here hid the whole bar (session icons + dedup toggle) on those
   // sessions. The bar's contents only depend on the session.
   if (!selectedSessionId) return null
 
   return (
-    <div className="flex items-center gap-2 px-3 py-2 border-b border-border min-h-[40px]">
-      <AgentCombobox />
-
+    <div className="flex items-center ml-auto shrink-0">
       <div className="flex items-center gap-1 shrink-0">
         {/* Follow */}
         <Button
@@ -78,6 +77,18 @@ export function ScopeBar() {
         >
           <SquarePen className="h-3.5 w-3.5" />
         </Button>
+        {/* Dedup toggle */}
+        <button
+          className={`rounded-full px-2 py-0.5 text-2xs border cursor-pointer transition-colors shrink-0 ml-1 ${
+            dedupEnabled
+              ? 'border-border/50 text-muted-foreground/50 hover:border-border hover:text-muted-foreground'
+              : 'border-orange-500/50 text-orange-500 hover:border-orange-500 hover:text-orange-600'
+          }`}
+          onClick={() => openSettings('settings')}
+          title={dedupEnabled ? 'Event dedup is on' : 'Event dedup is off — showing raw events'}
+        >
+          {dedupEnabled ? 'Dedup Events' : 'Raw Events'}
+        </button>
       </div>
     </div>
   )

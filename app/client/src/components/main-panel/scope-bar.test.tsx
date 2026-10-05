@@ -16,19 +16,20 @@ beforeEach(() => {
 
 describe('ScopeBar', () => {
   // Regression: unassigned sessions route as `#/_/<sessionId>`, so
-  // selectedProjectId is null. The bar (agent combobox + session icons) MUST
+  // selectedProjectId is null. The bar (session icons + dedup toggle) MUST
   // still render — it previously bailed to null on any falsy project id, so
-  // the whole row silently disappeared on unassigned sessions.
+  // the whole row silently disappeared on unassigned sessions. (The agent
+  // combobox lives in main-panel's header row, not ScopeBar.)
   it('renders for an unassigned session (project id is null)', () => {
     useUIStore.setState({ selectedProjectId: null, selectedSessionId: 'sess-1' })
 
     renderWithProviders(<ScopeBar />)
 
-    // Agent combobox present…
-    expect(screen.getByText('Agents')).toBeInTheDocument()
-    // …and the session icon buttons (Stats / Edit).
+    // Session icon buttons (Stats / Edit)…
     expect(screen.getByTitle('Session stats')).toBeInTheDocument()
     expect(screen.getByTitle('Edit session')).toBeInTheDocument()
+    // …and the dedup toggle moved here from the breadcrumb.
+    expect(screen.getByText(/^(Dedup|Raw) Events$/)).toBeInTheDocument()
   })
 
   it('still renders when a project is assigned', () => {
@@ -36,7 +37,7 @@ describe('ScopeBar', () => {
 
     renderWithProviders(<ScopeBar />)
 
-    expect(screen.getByText('Agents')).toBeInTheDocument()
+    expect(screen.getByTitle('Session stats')).toBeInTheDocument()
   })
 
   it('renders nothing when no session is selected', () => {

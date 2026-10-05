@@ -95,6 +95,8 @@ describe('MainPanel routing', () => {
     renderWithProviders(<MainPanel />)
 
     expect(screen.getByTestId('scope-bar')).toBeInTheDocument()
+    // Agent combobox sits in the shared header row, outside ScopeBar.
+    expect(screen.getByText('Agents')).toBeInTheDocument()
     expect(screen.getByTestId('event-stream')).toBeInTheDocument()
     expect(screen.queryByTestId('home-page')).not.toBeInTheDocument()
     expect(screen.queryByTestId('project-page')).not.toBeInTheDocument()
