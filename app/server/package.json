@@ -10,7 +10,7 @@
     "fmt": "prettier --write src/"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^25.5.0",
     "tsx": "^4.21.0",
     "vitest": "^5.0.2"
@@ -18,13 +18,13 @@
   "dependencies": {
     "@hono/node-server": "^2.1.1",
     "@types/ws": "^8.18.1",
-    "better-sqlite3": "^12.11.1",
+    "better-sqlite3": "^13.0.3",
     "hono": "^4.12.9",
     "re2js": "^2.6.1",
     "ws": "^8.20.0"
   },
   "allowScripts": {
-    "better-sqlite3@12.11.1": true,
+    "better-sqlite3@13.0.3": false,
     "esbuild@0.28.2": true,
     "fsevents@2.3.3": true
   }
