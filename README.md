@@ -242,7 +242,7 @@ Dockerfile                   # Production container image
 docker-compose.yml           # Container orchestration - not used by the plugin
 justfile                     # Task runner commands
 start.mjs                    # Local server entrypoint (non-Docker)
-vitest.config.ts             # Test configuration
+vitest.config.mts            # Test configuration
 package.json                 # Version metadata and workspace scripts
 ```
 
