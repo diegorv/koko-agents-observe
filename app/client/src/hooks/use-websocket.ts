@@ -236,7 +236,7 @@ export function useWebSocket(sessionId: string | null) {
           try {
             handleMessage(msg)
           } catch (err) {
-            console.error(`[WS] handler failed for '${msg.type}' message:`, err)
+            console.error("[WS] handler failed for '%s' message:", msg.type, err)
           }
         }
 

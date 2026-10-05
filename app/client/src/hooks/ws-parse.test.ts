@@ -27,9 +27,14 @@ describe('parseWsMessage', () => {
   it('truncates raw preview to 120 chars on parse failure', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     parseWsMessage('x'.repeat(500))
-    const logged = warn.mock.calls[0]?.[0] as string
-    const match = logged.match(/raw: (.*)\)$/)
-    expect(match).not.toBeNull()
-    expect(match![1].length).toBeLessThanOrEqual(120)
+    const raw = warn.mock.calls[0]?.[2] as string
+    expect(raw.length).toBeLessThanOrEqual(120)
+  })
+
+  it('keeps untrusted frame text out of the console format string', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    parseWsMessage('%c%s{not-json')
+    expect(warn.mock.calls[0]?.[0]).toBe('[WS] dropped malformed message: %s (raw: %s)')
+    expect(warn.mock.calls[0]?.[2]).toBe('%c%s{not-json')
   })
 })

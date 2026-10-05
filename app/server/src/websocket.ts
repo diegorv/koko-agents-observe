@@ -19,7 +19,8 @@ export function parseClientMessage(raw: string): WSClientMessage | null {
     return JSON.parse(raw) as WSClientMessage
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err)
-    console.warn(`[WS] dropped malformed client message: ${reason} (raw: ${raw.slice(0, 120)})`)
+    // Constant format string: frame text could contain %s/%o directives.
+    console.warn('[WS] dropped malformed client message: %s (raw: %s)', reason, raw.slice(0, 120))
     return null
   }
 }

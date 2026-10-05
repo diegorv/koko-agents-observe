@@ -60,6 +60,13 @@ describe('parseClientMessage', () => {
     expect(warn.mock.calls[0]?.[0]).toMatch(/dropped malformed client message/)
   })
 
+  it('keeps untrusted frame text out of the console format string', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    parseClientMessage('%c%s{not-json')
+    expect(warn.mock.calls[0]?.[0]).toBe('[WS] dropped malformed client message: %s (raw: %s)')
+    expect(warn.mock.calls[0]?.[2]).toBe('%c%s{not-json')
+  })
+
   it('truncates the raw preview to 120 characters', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     parseClientMessage('x'.repeat(500))
@@ -114,6 +121,10 @@ describe('WebSocket message handling (untrusted frames)', () => {
       clearInterval(poll)
       ws.close()
     }
-    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/dropped malformed client message/))
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringMatching(/dropped malformed client message/),
+      expect.anything(),
+      expect.anything(),
+    )
   })
 })

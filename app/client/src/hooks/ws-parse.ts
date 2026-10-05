@@ -16,7 +16,8 @@ export function parseWsMessage(data: unknown): WSMessage | null {
     return JSON.parse(data) as WSMessage
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err)
-    console.warn(`[WS] dropped malformed message: ${reason} (raw: ${data.slice(0, 120)})`)
+    // Constant format string: frame text could contain %c/%s directives.
+    console.warn('[WS] dropped malformed message: %s (raw: %s)', reason, data.slice(0, 120))
     return null
   }
 }
