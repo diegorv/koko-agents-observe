@@ -2,7 +2,8 @@
 # See: https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
 #
 # Monthly, with minor + patch updates grouped into one PR per ecosystem.
-# Major updates still arrive as individual PRs.
+# Major updates still arrive as individual PRs. A 10-day cooldown matches
+# the local npm min-release-age; security updates are not delayed.
 
 version: 2
 updates:
@@ -11,6 +12,8 @@ updates:
     directory: "/"
     schedule:
       interval: "monthly"
+    cooldown:
+      default-days: 10
     open-pull-requests-limit: 10
     groups:
       minor-and-patch:
@@ -21,6 +24,8 @@ updates:
     directory: "/app/server"
     schedule:
       interval: "monthly"
+    cooldown:
+      default-days: 10
     open-pull-requests-limit: 10
     groups:
       minor-and-patch:
@@ -31,6 +36,8 @@ updates:
     directory: "/app/client"
     schedule:
       interval: "monthly"
+    cooldown:
+      default-days: 10
     open-pull-requests-limit: 10
     groups:
       minor-and-patch:
@@ -42,6 +49,8 @@ updates:
     directory: "/"
     schedule:
       interval: "monthly"
+    cooldown:
+      default-days: 10
     ignore:
       - dependency-name: "node"
         update-types: ["version-update:semver-major"]
@@ -54,6 +63,8 @@ updates:
     directory: "/"
     schedule:
       interval: "monthly"
+    cooldown:
+      default-days: 10
     groups:
       minor-and-patch:
         update-types: ["minor", "patch"]
