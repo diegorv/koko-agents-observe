@@ -479,6 +479,9 @@ describe('EventStream', () => {
 
     // With 2 agents, should show agent labels
     expect(screen.getByText('Main')).toBeInTheDocument()
+    // The label floats over the row; the row reserves top padding for it
+    // so the summary can never render underneath the label.
+    expect(screen.getByText('Main').closest('button')).toHaveClass('pt-4')
   })
 
   it('should NOT show agent labels when only one agent exists', () => {
@@ -497,5 +500,7 @@ describe('EventStream', () => {
 
     // With only 1 agent, "Main" label should not appear
     expect(screen.queryByText('Main')).not.toBeInTheDocument()
+    // ...and the row doesn't reserve space for it
+    expect(screen.getByText('Hello').closest('button')).not.toHaveClass('pt-4')
   })
 })

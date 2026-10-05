@@ -10,7 +10,7 @@ import '@/agents/init'
 //
 // CAVEAT: these mocks apply to ALL HTMLElements globally. tanstack-virtual
 // reads the scroll element's size via offsetHeight, so the scroll container
-// also reports 800. With estimateSize=36 and overscan=10 the virtualizer
+// also reports 800. With estimateSize=40 and overscan=10 the virtualizer
 // renders ~30 rows in tests — fine for current tests but if you write a
 // test that needs to assert against a row beyond index ~25, that row may
 // not be mounted. Either keep test datasets small or override offsetHeight
@@ -36,7 +36,7 @@ Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
 
 // Minimal ResizeObserver stub — react-virtual uses it for measureElement.
 // No-op is fine: estimateSize is used until measureElement runs, and since
-// callbacks never fire in tests, all rows stay at the estimated 36px.
+// callbacks never fire in tests, all rows stay at the estimated 40px.
 if (typeof globalThis.ResizeObserver === 'undefined') {
   globalThis.ResizeObserver = class {
     observe() {}
