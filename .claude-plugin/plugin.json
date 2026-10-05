@@ -1,6 +1,6 @@
 {
   "name": "koko-agents-observe",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Real-time observability dashboard for Claude Code agents",
   "author": {
     "name": "diegorv"

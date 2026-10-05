@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.5.0 — Dependency upgrades across server, client, and tooling
+
+This is a maintenance release that brings the server, client, and test tooling up to their latest major versions. The SQLite driver now uses its bundled prebuilt binaries, so installs should be faster and more reliable. Dashboard features and behavior are unchanged.
+
+### Other
+
+- Upgraded server dependencies: `better-sqlite3` v13, which now uses its bundled prebuilds, and `@hono/node-server` v2
+- Upgraded the client build stack to TypeScript v7, Vite v8, and `@vitejs/plugin-react` v6, and upgraded `tailwind-merge` to v3
+- Upgraded test tooling to Vitest v5, jsdom v30, and `@testing-library/jest-dom` v7
+
 ## v1.4.0 — Security hardening and light-theme polish
 
 This release hardens the dashboard against untrusted WebSocket data and makes the constellation view easier to read in light mode. It also updates dependencies and tightens release tooling.
