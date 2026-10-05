@@ -999,7 +999,7 @@ function SessionStats({ sessionId }: { sessionId: string }) {
       </div>
       {(stats.permissionRequests > 0 || stats.permissionDenials > 0) && (
         <div>
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground/60 mb-1.5">
+          <div className="text-2xs uppercase tracking-wider text-muted-foreground/60 mb-1.5">
             Permissions
           </div>
           <div className="grid grid-cols-3 gap-3">
@@ -1016,7 +1016,7 @@ function SessionStats({ sessionId }: { sessionId: string }) {
     <div className="space-y-2">
       {stats.tools.length > 0 && (
         <div>
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground/60 mb-1.5">
+          <div className="text-2xs uppercase tracking-wider text-muted-foreground/60 mb-1.5">
             Top Tools
           </div>
           <div className="space-y-1">
@@ -1042,7 +1042,7 @@ function SessionStats({ sessionId }: { sessionId: string }) {
       )}
       {stats.longestToolCall && (
         <div className="text-sm">
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground/60 mr-2">
+          <span className="text-2xs uppercase tracking-wider text-muted-foreground/60 mr-2">
             Longest tool call:
           </span>
           <button
@@ -1066,7 +1066,7 @@ function SessionStats({ sessionId }: { sessionId: string }) {
   // every tool used in the session.
   const toolUsageDetails = (
     <div>
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground/60 mb-1.5">
+      <div className="text-2xs uppercase tracking-wider text-muted-foreground/60 mb-1.5">
         All Tools
       </div>
       <table className="w-full text-xs">
@@ -1079,18 +1079,18 @@ function SessionStats({ sessionId }: { sessionId: string }) {
               className="text-right font-normal py-1.5 px-2 border-l border-border/30 whitespace-nowrap"
               colSpan={3}
             >
-              <span className="text-[9px] uppercase tracking-wide">Duration</span>
+              <span className="text-2xs uppercase tracking-wide">Duration</span>
             </th>
           </tr>
           <tr className="text-muted-foreground/70 border-b border-border">
             <th></th>
             <th></th>
             <th></th>
-            <th className="text-right font-normal text-[10px] py-1 px-2 border-l border-border/30">
+            <th className="text-right font-normal text-2xs py-1 px-2 border-l border-border/30">
               Min
             </th>
-            <th className="text-right font-normal text-[10px] py-1 px-2">Median</th>
-            <th className="text-right font-normal text-[10px] py-1 px-2">Max</th>
+            <th className="text-right font-normal text-2xs py-1 px-2">Median</th>
+            <th className="text-right font-normal text-2xs py-1 px-2">Max</th>
           </tr>
         </thead>
         <tbody className="font-mono">
@@ -1197,7 +1197,7 @@ function SessionLabelsTab({ sessionId }: { sessionId: string }) {
                   type="button"
                   aria-pressed={selected}
                   onClick={() => toggleSessionLabel(label.id, sessionId)}
-                  className={`px-2 py-1 text-[11px] transition-colors cursor-pointer ${
+                  className={`px-2 py-1 text-2xs transition-colors cursor-pointer ${
                     selected
                       ? 'bg-primary text-primary-foreground border-primary'
                       : 'bg-background text-foreground hover:bg-accent'
@@ -1247,8 +1247,8 @@ function SessionLabelsTab({ sessionId }: { sessionId: string }) {
           Add
         </Button>
       </div>
-      {error && <p className="text-[11px] text-destructive mt-1.5">{error}</p>}
-      <p className="text-[10px] text-muted-foreground/70 mt-3">
+      {error && <p className="text-2xs text-destructive mt-1.5">{error}</p>}
+      <p className="text-2xs text-muted-foreground/70 mt-3">
         Labels are saved in this browser only.
       </p>
     </div>
@@ -1271,11 +1271,11 @@ function StatCard({
 }) {
   const body = (
     <div className="rounded-md bg-muted/30 px-3 py-2">
-      <div className="text-[10px] text-muted-foreground/70">{label}</div>
+      <div className="text-2xs text-muted-foreground/70">{label}</div>
       <div className="text-sm font-medium">
         {value}
         {secondary && (
-          <span className="ml-1 text-muted-foreground/50 text-[11px] font-normal">{secondary}</span>
+          <span className="ml-1 text-muted-foreground/50 text-2xs font-normal">{secondary}</span>
         )}
       </div>
     </div>
@@ -1345,7 +1345,7 @@ function CopyRow({
       <span className="text-muted-foreground/60 shrink-0 mt-px">{icon}</span>
       <span className="text-muted-foreground w-24 shrink-0">{label}</span>
       <span
-        className={`flex-1 min-w-0 font-mono text-[11px] ${wrap ? 'break-all' : 'truncate'}`}
+        className={`flex-1 min-w-0 font-mono text-2xs ${wrap ? 'break-all' : 'truncate'}`}
         title={wrap ? undefined : value}
       >
         {display ?? value}

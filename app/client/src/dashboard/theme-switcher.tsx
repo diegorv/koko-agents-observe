@@ -25,7 +25,7 @@ export function ThemeSwitcher({ activeId, onSelect }: ThemeSwitcherProps) {
             aria-pressed={isActive}
             title={theme.description}
             className={cn(
-              'flex items-center gap-1 rounded px-2 py-0.5 text-[10px] transition-colors cursor-pointer',
+              'flex items-center gap-1 rounded px-2 py-0.5 text-2xs transition-colors cursor-pointer',
               isActive
                 ? 'bg-accent text-foreground'
                 : 'text-muted-foreground hover:text-foreground',

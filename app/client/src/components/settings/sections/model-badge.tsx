@@ -45,10 +45,10 @@ export function ModelBadge({
           <span
             data-testid="model-badge"
             data-model-id={modelId}
-            className="inline-flex items-center text-[11px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-blue-300 cursor-help"
+            className="inline-flex items-center text-2xs font-mono px-1.5 py-0.5 rounded bg-slate-800 text-blue-300 cursor-help"
           >
             {label}
-            {effort ? <span className="ml-1 text-[9px] text-slate-300">{effort}</span> : null}
+            {effort ? <span className="ml-1 text-2xs text-slate-300">{effort}</span> : null}
           </span>
         </TooltipTrigger>
         <TooltipContent
@@ -60,18 +60,18 @@ export function ModelBadge({
           // multi-line pricing table.
           className="!bg-popover !text-popover-foreground border border-border max-w-xs p-3 shadow-md"
         >
-          <div className="font-mono text-[11px] text-foreground mb-1 break-all">{modelId}</div>
+          <div className="font-mono text-2xs text-foreground mb-1 break-all">{modelId}</div>
           {effort && (
-            <div className="text-[10px] text-muted-foreground mb-2">
+            <div className="text-2xs text-muted-foreground mb-2">
               Reasoning effort: <span className="text-foreground">{effort}</span>
             </div>
           )}
           {pricing ? (
             <>
-              <div className="text-[9px] uppercase tracking-wide text-muted-foreground mb-1">
+              <div className="text-2xs uppercase tracking-wide text-muted-foreground mb-1">
                 Pricing · per million tokens
               </div>
-              <table className="w-full font-mono text-[11px]">
+              <table className="w-full font-mono text-2xs">
                 <tbody>
                   <tr>
                     <td className="text-muted-foreground py-0.5">Input</td>
@@ -99,12 +99,12 @@ export function ModelBadge({
                   </tr>
                 </tbody>
               </table>
-              <div className="mt-2 text-[9px] italic text-muted-foreground">
+              <div className="mt-2 text-2xs italic text-muted-foreground">
                 Pricing from models.dev · refreshed daily
               </div>
             </>
           ) : (
-            <div className="text-[10px] text-muted-foreground italic">
+            <div className="text-2xs text-muted-foreground italic">
               Pricing not available for this model.
             </div>
           )}

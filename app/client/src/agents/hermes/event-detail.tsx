@@ -3,7 +3,7 @@ import type { EnrichedEvent, FrameworkDataApi } from '../types'
 function TextBlock({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground/60 mb-0.5">
+      <div className="text-2xs uppercase tracking-wider text-muted-foreground/60 mb-0.5">
         {label}
       </div>
       <div className="whitespace-pre-wrap break-words rounded bg-muted/50 p-2 text-xs leading-relaxed max-h-40 overflow-y-auto">
@@ -24,13 +24,11 @@ function Usage({ usage }: { usage: Record<string, any> }) {
   if (shown.length === 0) return null
   return (
     <div>
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground/60 mb-1">
-        Tokens
-      </div>
+      <div className="text-2xs uppercase tracking-wider text-muted-foreground/60 mb-1">Tokens</div>
       <div className="grid grid-cols-4 gap-2">
         {shown.map(([k, v]) => (
           <div key={k} className="rounded bg-muted/30 px-2 py-1">
-            <div className="text-[10px] text-muted-foreground/70">{k}</div>
+            <div className="text-2xs text-muted-foreground/70">{k}</div>
             <div className="text-xs font-mono">{(v as number).toLocaleString()}</div>
           </div>
         ))}
@@ -68,10 +66,10 @@ export function HermesEventDetail({ event }: { event: EnrichedEvent; dataApi: Fr
       {toolResult && <TextBlock label="Result" value={toolResult} />}
       {usage && <Usage usage={usage} />}
       <div>
-        <div className="text-[10px] uppercase tracking-wider text-muted-foreground/60 mb-0.5">
+        <div className="text-2xs uppercase tracking-wider text-muted-foreground/60 mb-0.5">
           Raw payload
         </div>
-        <pre className="overflow-x-auto rounded bg-muted/50 p-2 font-mono text-[10px] leading-relaxed max-h-60 overflow-y-auto">
+        <pre className="overflow-x-auto rounded bg-muted/50 p-2 font-mono text-2xs leading-relaxed max-h-60 overflow-y-auto">
           {JSON.stringify(event.payload, null, 2)}
         </pre>
       </div>

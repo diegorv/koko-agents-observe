@@ -20,9 +20,7 @@ export function CollapsibleSection({
   return (
     <div className="rounded-md border border-border mb-5 overflow-hidden">
       <div className="px-4 py-3">
-        <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
-          {title}
-        </div>
+        <div className="text-2xs uppercase tracking-wider text-muted-foreground mb-2">{title}</div>
         {preview}
         {expanded && hasDetails && <div className="mt-3">{details}</div>}
       </div>
@@ -30,7 +28,7 @@ export function CollapsibleSection({
         <button
           type="button"
           onClick={() => setExpanded((e) => !e)}
-          className="w-full border-t border-border/60 py-1.5 text-[11px] text-muted-foreground hover:text-amber-500 hover:bg-muted/30 transition-colors flex items-center justify-center gap-1"
+          className="w-full border-t border-border/60 py-1.5 text-2xs text-muted-foreground hover:text-amber-500 hover:bg-muted/30 transition-colors flex items-center justify-center gap-1"
         >
           {expanded ? 'Hide details' : 'View details'}
           {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}

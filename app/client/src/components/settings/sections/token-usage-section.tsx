@@ -135,10 +135,10 @@ function CostCell({
           align="start"
           className="!bg-popover !text-popover-foreground border border-amber-500 max-w-md p-3 shadow-md"
         >
-          <div className="text-[9px] uppercase tracking-wide text-muted-foreground mb-2">
+          <div className="text-2xs uppercase tracking-wide text-muted-foreground mb-2">
             Cost breakdown{multi && ' · multiple models'}
           </div>
-          <table className="font-mono text-[11px] border-separate" style={{ borderSpacing: '0 0' }}>
+          <table className="font-mono text-2xs border-separate" style={{ borderSpacing: '0 0' }}>
             <thead>
               <tr className="text-muted-foreground">
                 <th className="text-left font-normal pb-1.5 pr-4">Item</th>
@@ -160,7 +160,7 @@ function CostCell({
               ))}
               <tr className="border-t border-border/40">
                 <td
-                  className="pt-2 text-muted-foreground uppercase text-[9px] pr-4"
+                  className="pt-2 text-muted-foreground uppercase text-2xs pr-4"
                   colSpan={totalColSpan}
                 >
                   Total
@@ -214,9 +214,7 @@ function SectionShell({ title, children }: { title: string; children: React.Reac
   return (
     <div className="rounded-md border border-border mb-5 overflow-hidden">
       <div className="px-4 py-3">
-        <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
-          {title}
-        </div>
+        <div className="text-2xs uppercase tracking-wider text-muted-foreground mb-2">{title}</div>
         {children}
       </div>
     </div>
@@ -226,7 +224,7 @@ function SectionShell({ title, children }: { title: string; children: React.Reac
 function Card({ label, value, valueClass }: { label: string; value: string; valueClass?: string }) {
   return (
     <div className="rounded-md border border-border bg-muted/20 px-2.5 py-1.5">
-      <div className="text-[9px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="text-2xs uppercase tracking-wide text-muted-foreground">{label}</div>
       <div className={`font-mono text-sm ${valueClass ?? 'text-foreground'}`}>{value}</div>
     </div>
   )
@@ -756,7 +754,7 @@ export function TokenUsageSection({
 
   const agentFooter = useMemo(() => {
     const agentTotalCell = (
-      <span className="uppercase text-[9px] tracking-wide">
+      <span className="uppercase text-2xs tracking-wide">
         Total
         <span className="ml-1.5 text-muted-foreground/50 normal-case">({agentRows.length})</span>
       </span>
@@ -828,7 +826,7 @@ export function TokenUsageSection({
 
         {transcript && (
           <div>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground/60 mb-1.5">
+            <div className="text-2xs uppercase tracking-wider text-muted-foreground/60 mb-1.5">
               By Model
             </div>
             <SortableTable
@@ -840,7 +838,7 @@ export function TokenUsageSection({
         )}
 
         <div>
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground/60 mb-1.5">
+          <div className="text-2xs uppercase tracking-wider text-muted-foreground/60 mb-1.5">
             By Agent
           </div>
           <SortableTable
@@ -859,7 +857,7 @@ export function TokenUsageSection({
 
         {transcript && promptTotals && (
           <div>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground/60 mb-1.5">
+            <div className="text-2xs uppercase tracking-wider text-muted-foreground/60 mb-1.5">
               By Prompt
             </div>
             {transcript.prompts.length === 0 ? (
@@ -879,7 +877,7 @@ export function TokenUsageSection({
                 // captured, even within a muted row).
                 rowClassName={(r) => (r.requests === 0 ? 'opacity-50' : '')}
                 footer={[
-                  <span className="uppercase text-[9px] tracking-wide">
+                  <span className="uppercase text-2xs tracking-wide">
                     Total
                     <span className="ml-1.5 text-muted-foreground/50 normal-case">
                       ({transcript.prompts.length})
@@ -903,21 +901,19 @@ export function TokenUsageSection({
             available — the agents table still rendered above, this
             just tells the user why it isn't showing model + cost. */}
         {transcriptDisabledByFlag && (
-          <div className="flex items-start gap-2 text-[11px] text-muted-foreground/70 italic">
+          <div className="flex items-start gap-2 text-2xs text-muted-foreground/70 italic">
             <Info className="h-3 w-3 mt-0.5 shrink-0" />
             <span>{ERROR_MESSAGES.disabled}</span>
           </div>
         )}
         {transcriptError && (
-          <div className="flex items-start gap-2 text-[11px] text-muted-foreground/70 italic">
+          <div className="flex items-start gap-2 text-2xs text-muted-foreground/70 italic">
             <Info className="h-3 w-3 mt-0.5 shrink-0" />
             <span>{ERROR_MESSAGES[transcriptError.error] ?? transcriptError.message}</span>
           </div>
         )}
         {!isInjected && transcriptStatsEnabled && isLoading && !transcript && !transcriptError && (
-          <div className="text-[11px] text-muted-foreground/70 italic">
-            Loading model + cost data…
-          </div>
+          <div className="text-2xs text-muted-foreground/70 italic">Loading model + cost data…</div>
         )}
       </div>
     </SectionShell>
