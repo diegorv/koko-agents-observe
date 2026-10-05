@@ -198,6 +198,24 @@ describe('EventStream', () => {
     mockEventsState.isLoading = false
   })
 
+  // Search lives in the stream header, so it must not disappear while events
+  // load or when the session has none — otherwise an active query can't be
+  // cleared and the `/` shortcut has nothing to focus.
+  it('should keep the search input available while loading', () => {
+    mockEventsState.isLoading = true
+    renderEventStream()
+    expect(screen.getByPlaceholderText('Search events...')).toBeInTheDocument()
+    expect(screen.queryByText(/Events:/)).not.toBeInTheDocument()
+    mockEventsState.isLoading = false
+  })
+
+  it('should keep the search input available when the session has no events', () => {
+    setMockEvents([])
+    renderEventStream()
+    expect(screen.getByPlaceholderText('Search events...')).toBeInTheDocument()
+    expect(screen.queryByText(/Events:/)).not.toBeInTheDocument()
+  })
+
   it('should render events when available', () => {
     setMockEvents([
       makeEvent({
@@ -217,8 +235,9 @@ describe('EventStream', () => {
 
     renderEventStream()
 
-    // Should show event count
+    // Should show event count, with search next to it
     expect(screen.getByText('2')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Search events...')).toBeInTheDocument()
     // Should show event summaries
     expect(screen.getByText('Fix the bug')).toBeInTheDocument()
     expect(screen.getByText('Session cli')).toBeInTheDocument()

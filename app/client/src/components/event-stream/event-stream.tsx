@@ -9,6 +9,7 @@ import { getTimelineScrollTo, registerEventStreamScroll, withSyncLock } from '@/
 import { api } from '@/lib/api-client'
 import { useUIStore } from '@/stores/ui-store'
 import { EventRow } from './event-row'
+import { EventSearch } from '@/components/main-panel/event-search'
 import { TimestampTooltipProvider } from './timestamp-tooltip'
 import { format } from 'timeago.js'
 import { buildAgentColorMap } from '@/lib/agent-utils'
@@ -408,9 +409,33 @@ export function EventStream() {
   const lastTs = filteredEvents[filteredEvents.length - 1]?.timestamp
   const rawCount = rawEvents?.length ?? 0
   const showRawCount = rawCount !== filteredEvents.length
+  // Mirrors QueryBoundary's content branch: the count only means something
+  // once events have loaded, but search stays available in every state.
+  const hasEvents = (displayQuery.data?.length ?? 0) > 0
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex flex-wrap items-center gap-2 px-3 py-1 border-b border-border/50 shrink-0">
+        {hasEvents && (
+          <span className="text-xs text-muted-foreground">
+            Events: <span className="text-foreground">{filteredEvents.length}</span>
+            {showRawCount && (
+              <span className="text-muted-foreground/70 dark:text-muted-foreground/50">
+                {' '}
+                / {rawCount} raw
+              </span>
+            )}
+          </span>
+        )}
+        {hasEvents && firstTs && lastTs && (
+          <span className="text-2xs text-muted-foreground/70 dark:text-muted-foreground/50">
+            {format(firstTs)} — {format(lastTs)}
+          </span>
+        )}
+        <div className="ml-auto">
+          <EventSearch />
+        </div>
+      </div>
       <QueryBoundary
         query={displayQuery}
         loading={
@@ -427,22 +452,6 @@ export function EventStream() {
       >
         {() => (
           <>
-            <div className="flex items-center gap-2 px-3 py-1 border-b border-border/50 shrink-0">
-              <span className="text-xs text-muted-foreground">
-                Events: <span className="text-foreground">{filteredEvents.length}</span>
-                {showRawCount && (
-                  <span className="text-muted-foreground/70 dark:text-muted-foreground/50">
-                    {' '}
-                    / {rawCount} raw
-                  </span>
-                )}
-              </span>
-              {firstTs && lastTs && (
-                <span className="text-2xs text-muted-foreground/70 dark:text-muted-foreground/50">
-                  {format(firstTs)} — {format(lastTs)}
-                </span>
-              )}
-            </div>
             <div
               ref={scrollRef}
               data-region-target="events"
