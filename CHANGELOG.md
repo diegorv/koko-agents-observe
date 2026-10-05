@@ -1,8 +1,8 @@
 # Changelog
 
-## v1.0.4 — New hook events
+## v1.2.0 — New hook events
 
-First tagged release of the `koko-agents-observe` line. It also ships the changes listed under v1.0.1 and v1.0.0 below (the project rename and the MCP server path fix). Versions 1.0.0–1.0.3 were already used by earlier tags, so this release continues from v1.0.4.
+First tagged release of the `koko-agents-observe` line. It also ships the changes listed under v1.0.1 and v1.0.0 below (the project rename and the MCP server path fix). Versions 1.0.0–1.1.0 were already published by an earlier release line of this fork that is not part of the current history, so this release continues from v1.2.0.
 
 ### Features
 
