@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.4.0 — Security hardening and light-theme polish
+
+This release hardens the dashboard against untrusted WebSocket data and makes the constellation view easier to read in light mode. It also updates dependencies and tightens release tooling.
+
+### Fixes
+
+- Untrusted WebSocket data can no longer be read as console format strings, so crafted event payloads can't change log output
+- The constellation view's native color palette now has a light-theme variant and stays readable when the light theme is on
+
+### Other
+
+- Upgraded Vitest to 4.1.11 to patch a path traversal issue in `@vitest/mocker`
+- Release tags are now annotated so signed-tag Git configs work, and the Docker actions in the release workflow were bumped
+- Dependabot now waits 10 days before proposing updates, matching npm's minimum release age, and skips major `@types/node` bumps
+
 ## v1.3.0 — Security hardening, sturdier server routes, and a refreshed dashboard look
 
 This release makes the server safer by default. When started directly, it now listens only on loopback, and the server and dashboard handle malformed or corrupt data without crashing. The dashboard has a new navy dark palette, a more compact session header, and roomier event rows. The server now waits 5 minutes after the last activity before shutting itself down, up from 30 seconds.
