@@ -15,6 +15,10 @@ updates:
     cooldown:
       default-days: 10
     open-pull-requests-limit: 10
+    # Runtime is Node 24 (Dockerfile, CI); don't let @types/node jump majors past it.
+    ignore:
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     groups:
       minor-and-patch:
         update-types: ["minor", "patch"]
@@ -27,6 +31,10 @@ updates:
     cooldown:
       default-days: 10
     open-pull-requests-limit: 10
+    # Runtime is Node 24 (Dockerfile, CI); don't let @types/node jump majors past it.
+    ignore:
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     groups:
       minor-and-patch:
         update-types: ["minor", "patch"]
@@ -39,6 +47,10 @@ updates:
     cooldown:
       default-days: 10
     open-pull-requests-limit: 10
+    # Runtime is Node 24 (Dockerfile, CI); don't let @types/node jump majors past it.
+    ignore:
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     groups:
       minor-and-patch:
         update-types: ["minor", "patch"]
