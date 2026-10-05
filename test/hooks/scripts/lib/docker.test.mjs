@@ -4,6 +4,7 @@ import {
   buildPortMapping,
   buildTranscriptMounts,
   buildDataMount,
+  ensureImage,
 } from '../../../../hooks/scripts/lib/docker.mjs'
 
 describe('buildPortMapping (issue #22)', () => {
@@ -129,5 +130,43 @@ describe('buildDataMount (issue #20)', () => {
     expect(buildDataMount('/home/me/.agents-observe/data', false)).toBe(
       '/home/me/.agents-observe/data:/data',
     )
+  })
+})
+
+describe('ensureImage', () => {
+  const log = { info() {}, error() {} }
+  const image = 'agents-observe:local'
+
+  // Fake executor: records calls, answers per docker subcommand.
+  function fakeExec(results) {
+    const calls = []
+    const exec = async (cmd, args) => {
+      calls.push(args.slice(0, 2).join(' '))
+      return results[args[0] === 'image' ? 'inspect' : args[0]]
+    }
+    return { exec, calls }
+  }
+
+  it('uses a locally present image without pulling', async () => {
+    const { exec, calls } = fakeExec({ inspect: { ok: true } })
+    expect(await ensureImage({ dockerImage: image }, log, exec)).toBe(true)
+    expect(calls).toEqual(['image inspect'])
+  })
+
+  it('pulls when the image is not present locally', async () => {
+    const { exec, calls } = fakeExec({ inspect: { ok: false }, pull: { ok: true } })
+    expect(await ensureImage({ dockerImage: image }, log, exec)).toBe(true)
+    expect(calls).toEqual(['image inspect', 'pull agents-observe:local'])
+  })
+
+  it('fails when the image is neither local nor pullable', async () => {
+    const { exec } = fakeExec({ inspect: { ok: false }, pull: { ok: false, stderr: 'denied' } })
+    expect(await ensureImage({ dockerImage: image }, log, exec)).toBe(false)
+  })
+
+  it('skips docker entirely in the test harness', async () => {
+    const { exec, calls } = fakeExec({})
+    expect(await ensureImage({ dockerImage: image, testSkipPull: true }, log, exec)).toBe(true)
+    expect(calls).toEqual([])
   })
 })

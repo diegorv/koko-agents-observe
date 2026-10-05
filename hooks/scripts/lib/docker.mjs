@@ -95,6 +95,32 @@ export function buildPortMapping(bindHost, hostPort, containerPort) {
 }
 
 /**
+ * Make sure the image is available before `docker run`. An image already
+ * present locally is used as-is — locally built tags (e.g. `agents-observe:local`
+ * via AGENTS_OBSERVE_DOCKER_IMAGE) don't exist in any registry, so pulling them
+ * would always fail. Otherwise pull. Skipped entirely in the test harness
+ * (AGENTS_OBSERVE_TEST_SKIP_PULL=1). Returns false when the image is unavailable.
+ */
+export async function ensureImage(config, log = console, exec = run) {
+  if (config.testSkipPull) {
+    log.info('AGENTS_OBSERVE_TEST_SKIP_PULL=1 — skipping docker pull (test harness)')
+    return true
+  }
+  const inspect = await exec('docker', ['image', 'inspect', config.dockerImage])
+  if (inspect.ok) {
+    log.info(`Image ${config.dockerImage} found locally — skipping docker pull`)
+    return true
+  }
+  log.info('Pulling image and starting container...')
+  const pullResult = await exec('docker', ['pull', config.dockerImage])
+  if (!pullResult.ok) {
+    log.error(`Failed to pull image: ${pullResult.stderr}`)
+    return false
+  }
+  return true
+}
+
+/**
  * Build the `-v` value for the writable data mount. On SELinux hosts the
  * bind-mounted dir keeps its host label and the confined container can't write
  * to it, so the sqlite DB fails to open (SQLITE_CANTOPEN — GitHub issue #20).
@@ -212,17 +238,7 @@ export async function startServer(config, log = console) {
 
   // -- Fresh start: pull + run ------------------------------------
 
-  // Pull image (skipped in test harness when AGENTS_OBSERVE_TEST_SKIP_PULL=1)
-  if (!config.testSkipPull) {
-    log.info('Pulling image and starting container...')
-    const pullResult = await run('docker', ['pull', config.dockerImage])
-    if (!pullResult.ok) {
-      log.error(`Failed to pull image: ${pullResult.stderr}`)
-      return null
-    }
-  } else {
-    log.info('AGENTS_OBSERVE_TEST_SKIP_PULL=1 — skipping docker pull (test harness)')
-  }
+  if (!(await ensureImage(config, log))) return null
 
   // Build docker run args from centralized server env
   const serverEnv = getServerEnv(config)
