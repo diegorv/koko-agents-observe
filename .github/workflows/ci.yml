@@ -1,0 +1,60 @@
+name: CI
+
+permissions:
+  contents: read
+
+# Triggers:
+#   - push: main — revalidates every commit that lands on main.
+#   - pull_request: gate every PR against main before merge.
+#   - workflow_dispatch: manual revalidation.
+#
+# The shared `ci-${{ github.ref }}` concurrency group keeps PR + push
+# runs from racing. Tag pushes are owned end-to-end by release.yml.
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**/*.md"
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - "**/*.md"
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test + format + build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+
+      - name: Install root dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Install server dependencies
+        run: cd app/server && npm install --no-audit --no-fund
+
+      - name: Install client dependencies
+        run: cd app/client && npm install --no-audit --no-fund
+
+      - name: Run tests (scripts + server + client)
+        run: npm test
+
+      # `npm run fmt` writes formatted output; `fmt:check` runs the same
+      # pinned prettier with `--check` against the same globs so a PR with
+      # unformatted code fails before merge.
+      - name: Check formatting
+        run: npm run fmt:check
+
+      - name: Build client bundle
+        run: cd app/client && npm run build
