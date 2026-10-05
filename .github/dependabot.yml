@@ -1,0 +1,59 @@
+# Dependabot configuration.
+# See: https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+#
+# Monthly, with minor + patch updates grouped into one PR per ecosystem.
+# Major updates still arrive as individual PRs.
+
+version: 2
+updates:
+  # npm — root (test runner, tooling)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 10
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+
+  # npm — server (Hono / better-sqlite3 / @hono/node-server)
+  - package-ecosystem: "npm"
+    directory: "/app/server"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 10
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+
+  # npm — client (React / Vite)
+  - package-ecosystem: "npm"
+    directory: "/app/client"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 10
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+
+  # Docker base image. Node major is pinned to 24 (also in ci.yml and
+  # security.yml); bump it manually in all three places together.
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    ignore:
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
