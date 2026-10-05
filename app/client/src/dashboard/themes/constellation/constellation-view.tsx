@@ -426,11 +426,30 @@ export function ConstellationView({ onOpenSession }: DashboardThemeProps) {
     t.style.opacity = '1'
     t.style.left = `${e.clientX}px`
     t.style.top = `${e.clientY + 16}px`
-    t.innerHTML =
-      `<div class="cst-tt-slug">${m.slug}</div>` +
-      `<div class="cst-tt-row"><span>project</span><b>${m.projectName}</b></div>` +
-      `<div class="cst-tt-row"><span>subagents</span><b>${m.orbitDots}</b></div>` +
-      (flagged ? `<div class="cst-tt-attn">● needs attention</div>` : '')
+    // Built with textContent, not innerHTML: slug and project name come from
+    // hook events (e.g. a slug built from the raw git branch name) and must
+    // never be parsed as HTML.
+    const div = (className: string, text?: string) => {
+      const d = document.createElement('div')
+      d.className = className
+      if (text !== undefined) d.textContent = text
+      return d
+    }
+    const row = (label: string, value: string | number) => {
+      const r = div('cst-tt-row')
+      const span = document.createElement('span')
+      span.textContent = label
+      const b = document.createElement('b')
+      b.textContent = String(value)
+      r.append(span, b)
+      return r
+    }
+    t.replaceChildren(
+      div('cst-tt-slug', m.slug),
+      row('project', m.projectName),
+      row('subagents', m.orbitDots),
+      ...(flagged ? [div('cst-tt-attn', '● needs attention')] : []),
+    )
   }
   const hideTooltip = () => {
     if (tooltipRef.current) tooltipRef.current.style.opacity = '0'
