@@ -1501,6 +1501,20 @@ describe('filters', () => {
     expect(userFilters.length).toBe(1)
   })
 
+  test('listFilters tolerates corrupt patterns JSON', async () => {
+    const adapter = new SqliteAdapter(':memory:')
+    const f = await adapter.createFilter({
+      name: 'x',
+      pillName: 'x',
+      display: 'primary',
+      combinator: 'and',
+      patterns: [{ target: 'hook', regex: '.' }],
+    })
+    ;(adapter as any).db.prepare('UPDATE filters SET patterns = ? WHERE id = ?').run('{bad', f.id)
+    const row = (await adapter.listFilters()).find((x) => x.id === f.id)
+    expect(row?.patterns).toEqual([])
+  })
+
   test('deleteFilter removes the row', async () => {
     const adapter = new SqliteAdapter(':memory:')
     const f = await adapter.createFilter({

@@ -21,6 +21,7 @@ import { DuplicateEventSignatureError } from './types'
 import type { Filter, FilterRow, FilterPattern } from '../types'
 import { randomUUID } from 'node:crypto'
 import { SEED_FILTERS } from './seed-filters'
+import { safeParseJson } from '../utils/safe-parse-json'
 
 export class SqliteAdapter implements EventStore {
   private db: Database.Database
@@ -1544,13 +1545,15 @@ export class SqliteAdapter implements EventStore {
       // Bad JSON in the column — surface as an empty config rather than
       // crashing the list endpoint.
     }
+    const parsedPatterns = safeParseJson(row.patterns, `filter ${row.id} patterns`)
+    const patterns = Array.isArray(parsedPatterns) ? (parsedPatterns as FilterPattern[]) : []
     return {
       id: row.id,
       name: row.name,
       pillName: row.pill_name,
       display: row.display as 'primary' | 'secondary',
       combinator: row.combinator as 'and' | 'or',
-      patterns: JSON.parse(row.patterns),
+      patterns,
       kind: row.kind as 'default' | 'user',
       enabled: row.enabled === 1,
       config,
