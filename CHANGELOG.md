@@ -1,5 +1,40 @@
 # Changelog
 
+## v1.3.0 — Security hardening, sturdier server routes, and a refreshed dashboard look
+
+This release makes the server safer by default. When started directly, it now listens only on loopback, and the server and dashboard handle malformed or corrupt data without crashing. The dashboard has a new navy dark palette, a more compact session header, and roomier event rows. The server now waits 5 minutes after the last activity before shutting itself down, up from 30 seconds.
+
+### Breaking Changes
+
+- If you start the server directly (not through the plugin CLI or Docker) and don't set `AGENTS_OBSERVE_BIND_HOST`, it now listens on `127.0.0.1` instead of `0.0.0.0`. If you need access from your LAN, set `AGENTS_OBSERVE_BIND_HOST=0.0.0.0` when starting the server. This change doesn't affect Docker and plugin setups.
+
+### Features
+
+- The default auto-shutdown delay is now 5 minutes (was 30 seconds), so the server stays up between short breaks
+- The release script now works out the next version from `VERSION` with patch, minor, or major bumps
+
+### Fixes
+
+- Fixed an XSS risk in the constellation tooltip
+- The server no longer listens on all network interfaces by default when run outside Docker
+- `/observe restart` now really stops and recreates the server container
+- Session and project routes, and the filter list, now tolerate corrupt JSON in stored data
+- Session routes now return a 400 error for invalid integer query parameters
+- Malformed websocket frames are now logged, and non-string session IDs are rejected
+- If orphan repair fails at startup, the server now exits with a clear log message
+- Admin backups no longer risk overwriting the source database
+- `hook.sh` now fails gracefully when Node is missing
+- New visitors get the dark theme by default again
+- The release script now handles a multi-word `EDITOR` such as `code --wait`
+- `just logs` and the docs now point to the `logs-server` command
+- Aligned the esbuild install-script allowlist with the server lockfile
+
+### Other
+
+- Refreshed the dashboard visuals: navy dark palette, single-row session header, session ID shown more prominently in the breadcrumb, a standard set of small text sizes, more spacious event rows, and secondary filter pills that can wrap to three rows
+- Hardened the Dockerfile, moved to Node 24, updated dependencies, and added CI, security, and Dependabot workflows
+- Documented local testing workflows and moved event search into its own component
+
 ## v1.2.0 — New hook events
 
 First tagged release of the `koko-agents-observe` line. It also ships the changes listed under v1.0.1 and v1.0.0 below (the project rename and the MCP server path fix). Versions 1.0.0–1.1.0 were already published by an earlier release line of this fork that is not part of the current history, so this release continues from v1.2.0.
