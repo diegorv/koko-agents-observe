@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.0.4 — New hook events
+
+First tagged release of the `koko-agents-observe` line. It also ships the changes listed under v1.0.1 and v1.0.0 below (the project rename and the MCP server path fix). Versions 1.0.0–1.0.3 were already used by earlier tags, so this release continues from v1.0.4.
+
+### Features
+
+- Capture the `DirectoryAdded`, `PreModelSwitch` and `PostModelSwitch` hook events, with icons, labels, one-line summaries and detail rows in the dashboard. Model switch events show the from/to model, source, context tokens and the estimated cache-write cost. The hooks never block a model switch or add context, because the hook wrapper exits 0 immediately with no output.
+
 ## v1.0.1 — MCP server path fix
 
 ### Fixes
