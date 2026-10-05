@@ -1,6 +1,33 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest'
 import { Hono } from 'hono'
 import type { EventStore } from '../storage/types'
+import { parseNonNegativeIntParam } from './sessions'
+
+describe('parseNonNegativeIntParam', () => {
+  test('missing or empty input yields undefined (caller default applies)', () => {
+    expect(parseNonNegativeIntParam(undefined, 'limit')).toEqual({ ok: true, value: undefined })
+    expect(parseNonNegativeIntParam('', 'limit')).toEqual({ ok: true, value: undefined })
+  })
+
+  test('parses plain non-negative integers without capping', () => {
+    expect(parseNonNegativeIntParam('0', 'offset')).toEqual({ ok: true, value: 0 })
+    expect(parseNonNegativeIntParam('10000', 'limit')).toEqual({ ok: true, value: 10000 })
+    expect(parseNonNegativeIntParam('1700000000000', 'since')).toEqual({
+      ok: true,
+      value: 1700000000000,
+    })
+  })
+
+  test.each(['abc', '-1', '1.5', '1e3', ' 5', '0x10', '99999999999999999999'])(
+    'rejects %j',
+    (raw) => {
+      expect(parseNonNegativeIntParam(raw, 'limit')).toEqual({
+        ok: false,
+        error: 'limit must be a non-negative integer',
+      })
+    },
+  )
+})
 
 type Env = {
   Variables: {
@@ -88,6 +115,21 @@ describe('session routes — agentClasses response shape', () => {
     mockStore.getRecentSessions.mockResolvedValue([])
     await app.request('/api/sessions/recent?limit=200&since=1700000000000')
     expect(mockStore.getRecentSessions).toHaveBeenCalledWith(200, 1700000000000)
+  })
+
+  test('GET /api/sessions/recent passes a large ?limit through uncapped', async () => {
+    mockStore.getRecentSessions.mockResolvedValue([])
+    const res = await app.request('/api/sessions/recent?limit=10000')
+    expect(res.status).toBe(200)
+    expect(mockStore.getRecentSessions).toHaveBeenCalledWith(10000, undefined)
+  })
+
+  test('GET /api/sessions/recent rejects an invalid ?limit with 400', async () => {
+    const res = await app.request('/api/sessions/recent?limit=abc')
+    expect(res.status).toBe(400)
+    const body = (await res.json()) as { error: { message: string } }
+    expect(body.error.message).toMatch(/limit must be a non-negative integer/)
+    expect(mockStore.getRecentSessions).not.toHaveBeenCalled()
   })
 
   test('GET /api/sessions/recent ignores a non-numeric ?since (no window)', async () => {
@@ -251,6 +293,34 @@ describe('GET /api/sessions/:id/events — fields= allow-list', () => {
         _meta: { foo: 'bar' },
       },
     ])
+  })
+
+  test.each([
+    ['limit=abc', /limit must be a non-negative integer/],
+    ['offset=-5', /offset must be a non-negative integer/],
+    ['limit=1.5', /limit must be a non-negative integer/],
+    ['since=abc', /since must be a non-negative integer/],
+  ])('rejects ?%s with 400', async (qs, msg) => {
+    const res = await app.request(`/api/sessions/sess-1/events?${qs}`)
+    expect(res.status).toBe(400)
+    const body = (await res.json()) as { error: { message: string } }
+    expect(body.error.message).toMatch(msg)
+    expect(mockStore.getEventsForSession).not.toHaveBeenCalled()
+    expect(mockStore.getEventsSince).not.toHaveBeenCalled()
+  })
+
+  test('forwards valid limit/offset and a valid since to the store', async () => {
+    mockStore.getEventsForSession.mockResolvedValue([])
+    mockStore.getEventsSince.mockResolvedValue([])
+
+    await app.request('/api/sessions/sess-1/events?limit=10000&offset=0')
+    expect(mockStore.getEventsForSession).toHaveBeenCalledWith(
+      'sess-1',
+      expect.objectContaining({ limit: 10000, offset: 0 }),
+    )
+
+    await app.request('/api/sessions/sess-1/events?since=1700000000000')
+    expect(mockStore.getEventsSince).toHaveBeenCalledWith('sess-1', 1700000000000)
   })
 
   test('corrupt payload JSON falls back to {} instead of failing the endpoint', async () => {

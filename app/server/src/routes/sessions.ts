@@ -14,6 +14,22 @@ function parseAgentClasses(raw: unknown): string[] {
   return raw.split(',').filter(Boolean)
 }
 
+/** Validate an optional integer query param. Missing/empty → value
+ *  undefined (caller applies its default); anything other than a plain
+ *  non-negative integer (NaN, negative, float, "1e3") → error, which the
+ *  route turns into a 400 instead of sending NaN down to SQLite. */
+export function parseNonNegativeIntParam(
+  raw: string | undefined,
+  name: string,
+): { ok: true; value: number | undefined } | { ok: false; error: string } {
+  if (raw === undefined || raw === '') return { ok: true, value: undefined }
+  const n = Number(raw)
+  if (!/^\d+$/.test(raw) || !Number.isSafeInteger(n)) {
+    return { ok: false, error: `${name} must be a non-negative integer` }
+  }
+  return { ok: true, value: n }
+}
+
 type Env = {
   Variables: {
     store: EventStore
@@ -49,11 +65,12 @@ function rowToRecentSession(r: any) {
 // GET /sessions/recent
 router.get('/sessions/recent', async (c) => {
   const store = c.get('store')
-  const limit = c.req.query('limit') ? parseInt(c.req.query('limit')!) : 20
+  const limit = parseNonNegativeIntParam(c.req.query('limit'), 'limit')
+  if (!limit.ok) return apiError(c, 400, limit.error)
   // Optional activity window: only sessions with last activity >= since (ms).
   const sinceRaw = c.req.query('since') ? parseInt(c.req.query('since')!) : NaN
   const since = Number.isFinite(sinceRaw) ? sinceRaw : undefined
-  const rows = await store.getRecentSessions(limit, since)
+  const rows = await store.getRecentSessions(limit.value ?? 20, since)
   return c.json(rows.map(rowToRecentSession))
 })
 
@@ -63,8 +80,9 @@ router.get('/sessions/recent', async (c) => {
 // immediately throw away.
 router.get('/sessions/unassigned', async (c) => {
   const store = c.get('store')
-  const limit = c.req.query('limit') ? parseInt(c.req.query('limit')!) : 100
-  const rows = await store.getUnassignedSessions(limit)
+  const limit = parseNonNegativeIntParam(c.req.query('limit'), 'limit')
+  if (!limit.ok) return apiError(c, 400, limit.error)
+  const rows = await store.getUnassignedSessions(limit.value ?? 100)
   return c.json(rows.map(rowToRecentSession))
 })
 
@@ -127,15 +145,23 @@ router.get('/sessions/:id/events', async (c) => {
       .filter((f) => OPT_IN_FIELDS.has(f)),
   )
 
-  const rows = sinceParam
-    ? await store.getEventsSince(sessionId, parseInt(sinceParam))
-    : await store.getEventsForSession(sessionId, {
-        agentIds: agentIdParam ? agentIdParam.split(',') : undefined,
-        hookName: c.req.query('hookName') || undefined,
-        search: c.req.query('search') || undefined,
-        limit: c.req.query('limit') ? parseInt(c.req.query('limit')!) : undefined,
-        offset: c.req.query('offset') ? parseInt(c.req.query('offset')!) : undefined,
-      })
+  const since = parseNonNegativeIntParam(sinceParam, 'since')
+  if (!since.ok) return apiError(c, 400, since.error)
+  const limit = parseNonNegativeIntParam(c.req.query('limit'), 'limit')
+  if (!limit.ok) return apiError(c, 400, limit.error)
+  const offset = parseNonNegativeIntParam(c.req.query('offset'), 'offset')
+  if (!offset.ok) return apiError(c, 400, offset.error)
+
+  const rows =
+    since.value !== undefined
+      ? await store.getEventsSince(sessionId, since.value)
+      : await store.getEventsForSession(sessionId, {
+          agentIds: agentIdParam ? agentIdParam.split(',') : undefined,
+          hookName: c.req.query('hookName') || undefined,
+          search: c.req.query('search') || undefined,
+          limit: limit.value,
+          offset: offset.value,
+        })
 
   interface EventRow {
     id: number
