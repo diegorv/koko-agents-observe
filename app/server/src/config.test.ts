@@ -1,4 +1,4 @@
-import { describe, test, expect } from 'vitest'
+import { describe, test, expect, vi, afterEach } from 'vitest'
 import { resolve } from 'path'
 import { resolveHostDbPath } from './config'
 
@@ -24,5 +24,43 @@ describe('resolveHostDbPath (issue #21)', () => {
 
   test('resolves a relative fallback DB path', () => {
     expect(resolveHostDbPath('', 'data/observe.db')).toBe(resolve('data/observe.db'))
+  })
+})
+
+describe('config.bindHost default', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.resetModules()
+  })
+
+  async function loadBindHost(env: Record<string, string>): Promise<string> {
+    for (const [k, v] of Object.entries(env)) vi.stubEnv(k, v)
+    vi.resetModules()
+    const { config } = await import('./config')
+    return config.bindHost
+  }
+
+  test('defaults to loopback outside docker when unset', async () => {
+    expect(
+      await loadBindHost({ AGENTS_OBSERVE_BIND_HOST: '', AGENTS_OBSERVE_RUNTIME: 'local' }),
+    ).toBe('127.0.0.1')
+  })
+
+  test('defaults to 0.0.0.0 inside docker when unset', async () => {
+    expect(
+      await loadBindHost({ AGENTS_OBSERVE_BIND_HOST: '', AGENTS_OBSERVE_RUNTIME: 'docker' }),
+    ).toBe('0.0.0.0')
+  })
+
+  test('an explicit AGENTS_OBSERVE_BIND_HOST wins over the runtime default', async () => {
+    expect(
+      await loadBindHost({ AGENTS_OBSERVE_BIND_HOST: '0.0.0.0', AGENTS_OBSERVE_RUNTIME: 'local' }),
+    ).toBe('0.0.0.0')
+    expect(
+      await loadBindHost({
+        AGENTS_OBSERVE_BIND_HOST: '192.168.1.5',
+        AGENTS_OBSERVE_RUNTIME: 'docker',
+      }),
+    ).toBe('192.168.1.5')
   })
 })
