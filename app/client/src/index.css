@@ -57,28 +57,28 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
+  --background: #24252f;
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.145 0 0);
+  --card: #24252f;
   --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.145 0 0);
+  --popover: #24252f;
   --popover-foreground: oklch(0.985 0 0);
   --primary: oklch(0.985 0 0);
   --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
+  --secondary: #2e2f3d;
   --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
+  --muted: #2e2f3d;
+  --muted-foreground: oklch(0.8 0 0);
+  --accent: #33344a;
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.396 0.141 25.723);
   --destructive-foreground: oklch(0.637 0.237 25.331);
-  --border: oklch(0.269 0 0);
-  --input: oklch(0.269 0 0);
-  --ring: oklch(0.439 0 0);
-  --sidebar: oklch(0.17 0 0);
+  --border: #3a3c4d;
+  --input: #3a3c4d;
+  --ring: #5a5c6d;
+  --sidebar: #1d1e27;
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(0.269 0 0);
+  --sidebar-border: #2e2f3d;
 }
 
 @keyframes flash-ring {
