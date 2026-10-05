@@ -150,7 +150,7 @@ git add VERSION package.json .claude-plugin/plugin.json CHANGELOG.md
 git commit -m "release: v${VERSION}"
 
 echo "Tagging $TAG..."
-git tag "$TAG"
+git tag -m "Release $TAG" "$TAG"
 
 echo "Pushing to origin..."
 git push origin main "$TAG"
