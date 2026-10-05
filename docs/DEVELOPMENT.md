@@ -37,6 +37,44 @@ In dev mode, client and server run as separate processes on separate ports. In p
 | `just open` | Open dashboard in browser |
 | `just cli <cmd>` | Run CLI directly |
 
+## Testing local changes
+
+Two ways to run your code, depending on what you're iterating on.
+
+When run from a terminal (outside Claude Code), `just dev`, `just start` and `just restart` default to the same SQLite DB under `~/.koko-agents-observe/data`, so existing events show up in either mode. A marketplace plugin install keeps its own DB under `$CLAUDE_PLUGIN_DATA` — set `AGENTS_OBSERVE_LOCAL_DATA_ROOT` to point both at the same root (see [README › Data Location](../README.md#data-location)).
+
+### A) Hot-reload dev mode (recommended for UI work)
+
+```bash
+just stop      # free port 4981 if a container is running
+just dev       # API on :4981, Vite client on :5174 (HMR)
+```
+
+Open <http://localhost:5174>. Edits to `app/client/**` reload instantly; edits to `app/server/**` restart the API process.
+
+When done, stop `just dev` (Ctrl+C) and bring the container back with `just start`.
+
+### B) Rebuild and run the production container
+
+Use this to verify the bundled prod build (minified client, served by the server on a single port).
+
+```bash
+just build                                                    # builds koko-agents-observe:local
+AGENTS_OBSERVE_DOCKER_IMAGE=koko-agents-observe:local just restart
+```
+
+`just build` tags the image `koko-agents-observe:local`, but the CLI runs `ghcr.io/diegorv/koko-agents-observe:v<VERSION>` unless `AGENTS_OBSERVE_DOCKER_IMAGE` says otherwise — set it inline as above or in `.env`. `just restart` stops and removes the container and runs a fresh one from that image, so it always picks up a rebuilt image. `just build` is the only step that rebuilds: if your changes don't appear, rebuild first.
+
+To go back to the published image, remove `AGENTS_OBSERVE_DOCKER_IMAGE` (from the command line or `.env`) and run `just restart`.
+
+### Which one?
+
+| Change | Use |
+|---|---|
+| React component / styles / client logic | `just dev` |
+| Hono routes / SQLite / WebSocket handler | `just dev` (server hot-restarts too) |
+| Dockerfile / startup env / container behaviour | `just build` + `just restart` with the local image |
+
 ## Project Structure
 
 ```

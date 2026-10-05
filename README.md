@@ -260,7 +260,7 @@ In dev mode, the client and server run as separate processes with separate ports
 
 In production or docker mode, the client is bundled and served by the server. Both the API and dashboard are served from the same process and port.
 
-Both local dev and Docker flows default to using the same sqlite database in ./data. The database is auto created as needed.
+Outside Claude Code, both local dev and Docker flows default to using the same sqlite database in `~/.koko-agents-observe/data` (see [Data Location](#data-location)). The database is auto created as needed.
 
 ## Troubleshooting
 
@@ -275,6 +275,8 @@ The server auto-assigns a free port if 4981 is taken. To explicitly set a port, 
 **Plugin not capturing events?**
 
 Run `/observe debug` to diagnose. It checks server health, Docker container logs, MCP logs, and CLI logs. You can also run `/observe status` for a quick health check.
+
+If hooks silently stop reporting (for example, `node` is not on the PATH Claude Code uses), check `~/.koko-agents-observe/logs/hook.log`. The hook wrapper writes a breadcrumb there; this path is fixed and does not follow the data root.
 
 **Events not appearing in the dashboard?**
 
