@@ -7,7 +7,7 @@ const ThemeContext = createContext<{
   setMode: (mode: ThemeMode) => void
   // Resolved theme for components that need to know the actual value
   resolved: 'light' | 'dark'
-}>({ mode: 'light', setMode: () => {}, resolved: 'light' })
+}>({ mode: 'dark', setMode: () => {}, resolved: 'dark' })
 
 function getSystemTheme(): 'light' | 'dark' {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
@@ -17,7 +17,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [mode, setModeState] = useState<ThemeMode>(() => {
     const stored = localStorage.getItem('app-theme')
     if (stored === 'light' || stored === 'dark' || stored === 'system') return stored
-    return 'light'
+    return 'dark'
   })
 
   const resolved = mode === 'system' ? getSystemTheme() : mode
