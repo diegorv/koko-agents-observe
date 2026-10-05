@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import Markdown from 'react-markdown'
 import { Dialog, DialogContent, DialogClose, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Github, X, ExternalLink } from 'lucide-react'
+import { X, ExternalLink } from 'lucide-react'
+import { GithubIcon } from '@/components/shared/github-icon'
 import { api } from '@/lib/api-client'
 import { isNewerVersion } from '@/lib/utils'
 import { useUIStore } from '@/stores/ui-store'
@@ -86,7 +87,7 @@ export function ChangelogModal({ open, onOpenChange }: ChangelogModalProps) {
                   rel="noopener noreferrer"
                   title="View on GitHub"
                 >
-                  <Github className="h-4 w-4" />
+                  <GithubIcon className="h-4 w-4" />
                 </a>
               </Button>
             )}
