@@ -43,8 +43,8 @@ fi
 docker load -i /server-image.tar
 echo ""
 
-if ! docker images --format '{{.Repository}}:{{.Tag}}' | grep -q '^agents-observe:local$'; then
-  echo "FATAL: agents-observe:local not present in inner dockerd after load"
+if ! docker images --format '{{.Repository}}:{{.Tag}}' | grep -q '^koko-agents-observe:local$'; then
+  echo "FATAL: koko-agents-observe:local not present in inner dockerd after load"
   docker images
   exit 1
 fi
@@ -52,7 +52,7 @@ echo "Server image loaded successfully"
 echo ""
 
 # --- Configure plugin to use loaded image ------------------------------
-export AGENTS_OBSERVE_DOCKER_IMAGE=agents-observe:local
+export AGENTS_OBSERVE_DOCKER_IMAGE=koko-agents-observe:local
 export AGENTS_OBSERVE_TEST_SKIP_PULL=1
 echo "AGENTS_OBSERVE_DOCKER_IMAGE=$AGENTS_OBSERVE_DOCKER_IMAGE"
 echo "AGENTS_OBSERVE_TEST_SKIP_PULL=$AGENTS_OBSERVE_TEST_SKIP_PULL"
@@ -114,8 +114,8 @@ CHECK_3_RESULT="FAIL"; CHECK_3_DETAIL=""
 CHECK_4_MCP_COUNT=0
 CHECK_4_CLI_COUNT=0
 
-# Check 1: inner agents-observe container exists and is running
-CONTAINER_STATUS="$(docker ps -a --filter name=agents-observe --format '{{.Status}}' | head -1)"
+# Check 1: inner koko-agents-observe container exists and is running
+CONTAINER_STATUS="$(docker ps -a --filter name=koko-agents-observe --format '{{.Status}}' | head -1)"
 if [ -n "$CONTAINER_STATUS" ] && echo "$CONTAINER_STATUS" | grep -qi '^up'; then
   CHECK_1_RESULT="PASS"
   CHECK_1_DETAIL="$CONTAINER_STATUS"
@@ -199,11 +199,11 @@ echo "--- docker images ---"
 docker images
 echo ""
 
-echo "=== docker logs agents-observe (inner server container) ==="
-if docker ps -a --format '{{.Names}}' | grep -q '^agents-observe$'; then
-  docker logs agents-observe 2>&1 || true
+echo "=== docker logs koko-agents-observe (inner server container) ==="
+if docker ps -a --format '{{.Names}}' | grep -q '^koko-agents-observe$'; then
+  docker logs koko-agents-observe 2>&1 || true
 else
-  echo "(agents-observe container not present)"
+  echo "(koko-agents-observe container not present)"
 fi
 echo ""
 
@@ -312,9 +312,9 @@ if [ "${AGENTS_OBSERVE_TEST_KEEP_ALIVE:-}" = "1" ]; then
     echo "  docker exec -it \$(hostname) bash"
   fi
   echo ""
-  if docker ps -a --format '{{.Names}}' | grep -q '^agents-observe$'; then
+  if docker ps -a --format '{{.Names}}' | grep -q '^koko-agents-observe$'; then
     echo "=== Following inner server logs ==="
-    docker logs -f agents-observe 2>&1 &
+    docker logs -f koko-agents-observe 2>&1 &
   fi
   sleep infinity
 fi

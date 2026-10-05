@@ -115,27 +115,27 @@ describe('buildTranscriptMounts (issue #21)', () => {
 
 describe('buildDataMount (issue #20)', () => {
   it('mounts the data dir at /data without a relabel option by default', () => {
-    expect(buildDataMount('/home/me/.agents-observe/data')).toBe(
-      '/home/me/.agents-observe/data:/data',
+    expect(buildDataMount('/home/me/.koko-agents-observe/data')).toBe(
+      '/home/me/.koko-agents-observe/data:/data',
     )
   })
 
   it('appends the SELinux relabel option (:z) when relabel is set', () => {
-    expect(buildDataMount('/home/me/.agents-observe/data', true)).toBe(
-      '/home/me/.agents-observe/data:/data:z',
+    expect(buildDataMount('/home/me/.koko-agents-observe/data', true)).toBe(
+      '/home/me/.koko-agents-observe/data:/data:z',
     )
   })
 
   it('does not relabel when relabel is false', () => {
-    expect(buildDataMount('/home/me/.agents-observe/data', false)).toBe(
-      '/home/me/.agents-observe/data:/data',
+    expect(buildDataMount('/home/me/.koko-agents-observe/data', false)).toBe(
+      '/home/me/.koko-agents-observe/data:/data',
     )
   })
 })
 
 describe('ensureImage', () => {
   const log = { info() {}, error() {} }
-  const image = 'agents-observe:local'
+  const image = 'koko-agents-observe:local'
 
   // Fake executor: records calls, answers per docker subcommand.
   function fakeExec(results) {
@@ -156,7 +156,7 @@ describe('ensureImage', () => {
   it('pulls when the image is not present locally', async () => {
     const { exec, calls } = fakeExec({ inspect: { ok: false }, pull: { ok: true } })
     expect(await ensureImage({ dockerImage: image }, log, exec)).toBe(true)
-    expect(calls).toEqual(['image inspect', 'pull agents-observe:local'])
+    expect(calls).toEqual(['image inspect', 'pull koko-agents-observe:local'])
   })
 
   it('fails when the image is neither local nor pullable', async () => {

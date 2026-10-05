@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.0.0 — Koko Agents Observe
+
+First release under the new name. The project is now developed independently as `koko-agents-observe`, based on [simple10/agents-observe](https://github.com/simple10/agents-observe) v0.9.12.
+
+### Breaking Changes
+
+- Renamed everywhere from `agents-observe` to `koko-agents-observe`: plugin and marketplace, Docker container and default image (`ghcr.io/diegorv/koko-agents-observe`), local build tag (`koko-agents-observe:local`), data dir (`~/.koko-agents-observe` / `$CLAUDE_PLUGIN_DATA`), API id, Docker label, MCP server name, and dashboard `localStorage` keys. Existing data and UI preferences from `agents-observe` are not carried over. `AGENTS_OBSERVE_*` environment variables are unchanged.
+
+### Fixes
+
+- Use a locally present Docker image instead of always pulling, so locally built tags (e.g. `koko-agents-observe:local`) can auto-start.
+
 ## v0.9.12 — Security hardening and cross-platform fixes
 
 This release tightens default security by binding the server to loopback, restricting CORS, and rejecting cross-origin WebSocket connections. It also fixes running the dashboard on Windows and SELinux hosts, and improves structured output summaries.

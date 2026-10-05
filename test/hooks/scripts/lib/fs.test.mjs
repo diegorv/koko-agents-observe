@@ -76,7 +76,7 @@ describe('validatePath', () => {
   })
 
   it('allows dot-prefixed paths', () => {
-    expect(validatePath('/home/user/.agents-observe')).toBe('/home/user/.agents-observe')
+    expect(validatePath('/home/user/.koko-agents-observe')).toBe('/home/user/.koko-agents-observe')
   })
 })
 
@@ -165,18 +165,18 @@ describe('ensureLocalDataDirs', () => {
 describe('resolvePluginDataDir', () => {
   it('returns pluginDataDir when it contains the plugin name', () => {
     const config = {
-      pluginDataDir: '/home/user/.claude/plugins/data/agents-observe',
-      pluginName: 'agents-observe',
+      pluginDataDir: '/home/user/.claude/plugins/data/koko-agents-observe',
+      pluginName: 'koko-agents-observe',
       homeDir: '/home/user',
       serverPortFileName: 'server-port',
     }
-    expect(resolvePluginDataDir(config)).toBe('/home/user/.claude/plugins/data/agents-observe')
+    expect(resolvePluginDataDir(config)).toBe('/home/user/.claude/plugins/data/koko-agents-observe')
   })
 
   it('returns null when pluginDataDir points to wrong plugin and no port file exists', () => {
     const config = {
       pluginDataDir: '/home/user/.claude/plugins/data/some-other-plugin',
-      pluginName: 'agents-observe',
+      pluginName: 'koko-agents-observe',
       homeDir: testDir,
       serverPortFileName: 'server-port',
     }
@@ -186,7 +186,7 @@ describe('resolvePluginDataDir', () => {
   it('returns null when pluginDataDir is undefined and no port file exists', () => {
     const config = {
       pluginDataDir: undefined,
-      pluginName: 'agents-observe',
+      pluginName: 'koko-agents-observe',
       homeDir: testDir,
       serverPortFileName: 'server-port',
     }
@@ -196,7 +196,7 @@ describe('resolvePluginDataDir', () => {
   it('returns null when homeDir is empty', () => {
     const config = {
       pluginDataDir: undefined,
-      pluginName: 'agents-observe',
+      pluginName: 'koko-agents-observe',
       homeDir: '',
       serverPortFileName: 'server-port',
     }
@@ -204,13 +204,13 @@ describe('resolvePluginDataDir', () => {
   })
 
   it('discovers inline plugin dir via server-port file', () => {
-    const inlineDir = join(testDir, '.claude/plugins/data/agents-observe-inline')
+    const inlineDir = join(testDir, '.claude/plugins/data/koko-agents-observe-inline')
     mkdirSync(inlineDir, { recursive: true })
     writeFileSync(join(inlineDir, 'server-port'), '4981')
 
     const config = {
       pluginDataDir: '/wrong/plugin',
-      pluginName: 'agents-observe',
+      pluginName: 'koko-agents-observe',
       homeDir: testDir,
       serverPortFileName: 'server-port',
     }
@@ -218,13 +218,13 @@ describe('resolvePluginDataDir', () => {
   })
 
   it('discovers bare plugin dir via server-port file', () => {
-    const bareDir = join(testDir, '.claude/plugins/data/agents-observe')
+    const bareDir = join(testDir, '.claude/plugins/data/koko-agents-observe')
     mkdirSync(bareDir, { recursive: true })
     writeFileSync(join(bareDir, 'server-port'), '4981')
 
     const config = {
       pluginDataDir: '/wrong/plugin',
-      pluginName: 'agents-observe',
+      pluginName: 'koko-agents-observe',
       homeDir: testDir,
       serverPortFileName: 'server-port',
     }
@@ -232,8 +232,8 @@ describe('resolvePluginDataDir', () => {
   })
 
   it('prefers inline dir over bare dir when both exist', () => {
-    const inlineDir = join(testDir, '.claude/plugins/data/agents-observe-inline')
-    const bareDir = join(testDir, '.claude/plugins/data/agents-observe')
+    const inlineDir = join(testDir, '.claude/plugins/data/koko-agents-observe-inline')
+    const bareDir = join(testDir, '.claude/plugins/data/koko-agents-observe')
     mkdirSync(inlineDir, { recursive: true })
     mkdirSync(bareDir, { recursive: true })
     writeFileSync(join(inlineDir, 'server-port'), '4981')
@@ -241,7 +241,7 @@ describe('resolvePluginDataDir', () => {
 
     const config = {
       pluginDataDir: '/wrong/plugin',
-      pluginName: 'agents-observe',
+      pluginName: 'koko-agents-observe',
       homeDir: testDir,
       serverPortFileName: 'server-port',
     }

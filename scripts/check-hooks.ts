@@ -112,7 +112,7 @@ async function fetchDocumentedHooks(): Promise<string[]> {
 
 /** Build the prompt sent to the claude CLI for hook-safety analysis. */
 function buildAiPrompt(hooksDocMd: string): string {
-  return `You are analyzing Claude Code hook documentation for a plugin called "agents-observe" that is purely an observability/logging plugin. It should ONLY register hooks where it can safely observe events WITHOUT affecting Claude Code's behavior.
+  return `You are analyzing Claude Code hook documentation for a plugin called "koko-agents-observe" that is purely an observability/logging plugin. It should ONLY register hooks where it can safely observe events WITHOUT affecting Claude Code's behavior.
 
 Your task is to classify each hook event documented below into one of three categories:
 

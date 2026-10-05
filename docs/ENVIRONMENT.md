@@ -25,7 +25,7 @@ per-user behavior.
 | `AGENTS_OBSERVE_LOG_LEVEL` | `warn` | CLI log level: `error`, `warn`, `info`, `debug`, `trace`. |
 | `AGENTS_OBSERVE_LOGS_DIR` | `<data root>/logs` | Directory where the CLI writes logs. |
 | `AGENTS_OBSERVE_HOOK_STARTUP_TIMEOUT` | `30000` | Ms the `hook-autostart` command waits for the server to become healthy after starting it. |
-| `AGENTS_OBSERVE_LOCAL_DATA_ROOT` | `$CLAUDE_PLUGIN_DATA` (plugin) / `~/.agents-observe` (else) | Root directory for the SQLite DB, logs, and server-port file. The DB lives at `<root>/data/observe.db`. |
+| `AGENTS_OBSERVE_LOCAL_DATA_ROOT` | `$CLAUDE_PLUGIN_DATA` (plugin) / `~/.koko-agents-observe` (else) | Root directory for the SQLite DB, logs, and server-port file. The DB lives at `<root>/data/observe.db`. |
 
 ---
 
@@ -80,8 +80,8 @@ Controls where and how the server runs.
 | `AGENTS_OBSERVE_RUNTIME` | `docker` | How to run the server: `docker` (container), `local` (node subprocess), `dev` (vite dev server + local node). |
 | `AGENTS_OBSERVE_RUNTIME_DEV` | *(set by CLI)* | Internal flag (`1` or empty) so the server knows it's running under `dev`. Don't set this manually. |
 | `AGENTS_OBSERVE_DEV_CLIENT_PORT` | `5174` | Port the Vite dev server listens on in `dev` runtime. |
-| `AGENTS_OBSERVE_DOCKER_IMAGE` | `ghcr.io/simple10/agents-observe:v<version>` | Override the Docker image tag. Useful for testing local builds. |
-| `AGENTS_OBSERVE_DOCKER_CONTAINER_NAME` | `agents-observe` | Name of the managed Docker container. |
+| `AGENTS_OBSERVE_DOCKER_IMAGE` | `ghcr.io/diegorv/koko-agents-observe:v<version>` | Override the Docker image tag. Useful for testing local builds. |
+| `AGENTS_OBSERVE_DOCKER_CONTAINER_NAME` | `koko-agents-observe` | Name of the managed Docker container. |
 | `AGENTS_OBSERVE_SELINUX_RELABEL` | `auto` | Whether docker bind mounts carry the SELinux `z` relabel option so the container can access them on SELinux hosts (fixes `SQLITE_CANTOPEN` on startup — issue #20). `auto` detects SELinux via `/sys/fs/selinux` (never emitted on non-SELinux systems or Docker Desktop/Mac/Windows/WSL). Set `off` to disable (e.g. to avoid relabeling `~/.claude`/`~/.codex` transcript dirs), or `on` to force. |
 
 ---

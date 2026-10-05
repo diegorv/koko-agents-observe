@@ -1,11 +1,11 @@
 {
-  "name": "agents-observe",
+  "name": "koko-agents-observe",
   "owner": {
-    "name": "simple10"
+    "name": "diegorv"
   },
   "plugins": [
     {
-      "name": "agents-observe",
+      "name": "koko-agents-observe",
       "description": "Real-time observability dashboard for Claude Code agents",
       "source": "./"
     }

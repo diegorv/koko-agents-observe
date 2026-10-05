@@ -1,7 +1,7 @@
-"""agents-observe — fire-and-forget observability for Hermes.
+"""koko-agents-observe — fire-and-forget observability for Hermes.
 
 Ships every supported hook payload to an
-[agents-observe](https://github.com/simple10/agents-observe) HTTP backend.
+[koko-agents-observe](https://github.com/diegorv/koko-agents-observe) HTTP backend.
 Pure observation: never mutates payloads, never blocks the agent. A missing
 or hung backend is invisible to Hermes — the hot path is bounded to a
 shallow dict copy and a non-blocking `Queue.put_nowait` (~µs). All
@@ -143,7 +143,7 @@ def _redact_large_images(payload: Dict[str, Any], cap: int = 4000) -> None:
 
     Hermes' generic tool layer doesn't produce these, but ``post_tool_call``
     can carry through MCP tools that mimic the Claude-Code shape — keeping
-    the heuristic matches agents-observe's behavior across agent classes.
+    the heuristic matches koko-agents-observe's behavior across agent classes.
     """
     resp = payload.get("tool_response")
     if not isinstance(resp, list):
@@ -201,7 +201,7 @@ def _post(envelope: Dict[str, Any]) -> None:
         body = json.dumps(envelope, default=repr).encode("utf-8")
     except Exception as exc:  # pragma: no cover - last-resort guard
         if _DEBUG:
-            logger.info("agents-observe: json encode failed: %s", exc)
+            logger.info("koko-agents-observe: json encode failed: %s", exc)
         return
 
     req = urllib.request.Request(
@@ -213,15 +213,15 @@ def _post(envelope: Dict[str, Any]) -> None:
     try:
         with urllib.request.urlopen(req, timeout=_TIMEOUT_S) as resp:
             # Drain a bounded chunk so the connection can close cleanly. We
-            # don't care about the response body — agents-observe's callback
+            # don't care about the response body — koko-agents-observe's callback
             # protocol is a no-op for us (pure observation).
             resp.read(1024)
     except (urllib.error.URLError, TimeoutError, OSError) as exc:
         if _DEBUG:
-            logger.info("agents-observe: POST failed: %s", exc)
+            logger.info("koko-agents-observe: POST failed: %s", exc)
     except Exception as exc:  # pragma: no cover - last-resort guard
         if _DEBUG:
-            logger.info("agents-observe: POST error: %s", exc)
+            logger.info("koko-agents-observe: POST error: %s", exc)
 
 
 # -- worker thread --------------------------------------------------------
@@ -241,7 +241,7 @@ def _worker_loop() -> None:
             ts, hook_name, kwargs = _QUEUE.get()
         except Exception as exc:  # pragma: no cover - shutdown race
             if _DEBUG:
-                logger.info("agents-observe: queue get failed: %s", exc)
+                logger.info("koko-agents-observe: queue get failed: %s", exc)
             time.sleep(0.1)
             continue
         try:
@@ -250,7 +250,7 @@ def _worker_loop() -> None:
         except Exception as exc:
             if _DEBUG:
                 logger.info(
-                    "agents-observe: dropped %s (%s: %s)",
+                    "koko-agents-observe: dropped %s (%s: %s)",
                     hook_name, type(exc).__name__, exc,
                 )
 
@@ -281,12 +281,12 @@ def _make_observer(hook_name: str):
             _DROPPED += 1
             if _DEBUG and _DROPPED % 100 == 1:
                 logger.info(
-                    "agents-observe: queue full, dropped %d events so far",
+                    "koko-agents-observe: queue full, dropped %d events so far",
                     _DROPPED,
                 )
         except Exception as exc:  # pragma: no cover - last-resort guard
             if _DEBUG:
-                logger.info("agents-observe: enqueue failed: %s", exc)
+                logger.info("koko-agents-observe: enqueue failed: %s", exc)
         return None
 
     observer.__name__ = f"observe_{hook_name}"
@@ -303,7 +303,7 @@ def _start_worker_once() -> None:
             return
         t = threading.Thread(
             target=_worker_loop,
-            name="agents-observe-worker",
+            name="koko-agents-observe-worker",
             daemon=True,
         )
         t.start()
@@ -323,7 +323,7 @@ def register(ctx) -> None:
     base_url = _env("HERMES_AGENTS_OBSERVE_URL")
     if not base_url:
         logger.info(
-            "agents-observe: HERMES_AGENTS_OBSERVE_URL not set — plugin inert"
+            "koko-agents-observe: HERMES_AGENTS_OBSERVE_URL not set — plugin inert"
         )
         return
 
@@ -342,6 +342,6 @@ def register(ctx) -> None:
         ctx.register_hook(hook, _make_observer(hook))
 
     logger.info(
-        "agents-observe: registered %d hooks -> %s (project_slug=%r, timeout=%.2fs, queue=%d)",
+        "koko-agents-observe: registered %d hooks -> %s (project_slug=%r, timeout=%.2fs, queue=%d)",
         len(_HOOKS), _BASE_URL, _PROJECT_SLUG or None, _TIMEOUT_S, queue_size,
     )

@@ -22,7 +22,7 @@ const installDir = resolve(dirname(fileURLToPath(import.meta.url)), '../../../')
  */
 export function getConfig(overrides = {}) {
   /** Name of plugin to use for validating CLAUDE_PLUGIN_* env vars at runtime */
-  const pluginName = 'agents-observe'
+  const pluginName = 'koko-agents-observe'
   /** True when claude is running the scripts as via plugin hooks or mcp */
   const isPlugin = !!process.env.CLAUDE_PLUGIN_DATA
 
@@ -101,7 +101,7 @@ export function getConfig(overrides = {}) {
   const version = readVersionFile(tmpConfig)
   const dockerImage =
     process.env.AGENTS_OBSERVE_DOCKER_IMAGE ||
-    `ghcr.io/simple10/agents-observe:${version ? `v${version}` : 'latest'}`
+    `ghcr.io/diegorv/koko-agents-observe:${version ? `v${version}` : 'latest'}`
 
   // Notification trigger list. Three states — preserve the distinction:
   //   undefined  → agent-lib falls back to its default (['Notification'])
@@ -213,15 +213,15 @@ export function getConfig(overrides = {}) {
     containerName:
       overrides.containerName ||
       process.env.AGENTS_OBSERVE_DOCKER_CONTAINER_NAME ||
-      'agents-observe',
+      'koko-agents-observe',
     dockerImage,
 
     /* Local dir used to store sqlite database */
     dataDir,
     databaseFileName: 'observe.db',
 
-    API_ID: 'agents-observe',
-    dockerLabel: 'simple10-agents-observe.managed',
+    API_ID: 'koko-agents-observe',
+    dockerLabel: 'diegorv-koko-agents-observe.managed',
     /** True when docker bind mounts should carry the SELinux `z` relabel option (issue #20). */
     selinuxRelabel,
     expectedVersion: version,

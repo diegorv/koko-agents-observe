@@ -1,4 +1,4 @@
-# Repo-local Codex config for agents-observe integration.
+# Repo-local Codex config for koko-agents-observe integration.
 # Codex loads this only after the project is trusted.
 
 [features]

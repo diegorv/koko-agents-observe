@@ -1,7 +1,7 @@
-name: agents-observe
+name: koko-agents-observe
 version: "0.1.0"
-description: "Fire-and-forget observability — ships every Hermes hook payload to an agents-observe HTTP backend. Pure observation; never mutates payloads, never blocks the agent. Enable with `hermes plugins enable agents-observe`; configure with HERMES_AGENTS_OBSERVE_URL."
-author: simple10
+description: "Fire-and-forget observability — ships every Hermes hook payload to an koko-agents-observe HTTP backend. Pure observation; never mutates payloads, never blocks the agent. Enable with `hermes plugins enable koko-agents-observe`; configure with HERMES_AGENTS_OBSERVE_URL."
+author: diegorv
 kind: standalone
 requires_env:
   - HERMES_AGENTS_OBSERVE_URL

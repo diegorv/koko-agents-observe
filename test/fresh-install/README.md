@@ -1,10 +1,10 @@
 # Fresh Install Test Harness
 
-Reproduces a pristine fresh-install environment and runs the real `claude` CLI against the agents-observe plugin end-to-end, verifying that the MCP-spawn → `startServer()` → event-capture flow works from zero state.
+Reproduces a pristine fresh-install environment and runs the real `claude` CLI against the koko-agents-observe plugin end-to-end, verifying that the MCP-spawn → `startServer()` → event-capture flow works from zero state.
 
 ## Why this exists
 
-The plugin auto-starts its Docker server container on first use via an MCP server Claude spawns when loading the plugin. When this fails on a user's machine (see [#6](https://github.com/simple10/agents-observe/issues/6)), reproducing it locally is hard — prior images, containers, and data directories contaminate the test. This harness runs everything inside an isolated `docker:dind` container so every run is pristine.
+The plugin auto-starts its Docker server container on first use via an MCP server Claude spawns when loading the plugin. When this fails on a user's machine (see [#6](https://github.com/diegorv/koko-agents-observe/issues/6)), reproducing it locally is hard — prior images, containers, and data directories contaminate the test. This harness runs everything inside an isolated `docker:dind` container so every run is pristine.
 
 ## Usage
 
@@ -28,7 +28,7 @@ The script builds the server image, saves it to a tarball, builds the test conta
 
 Four checks run after `claude` exits:
 
-1. **Inner container exists** — `docker ps -a` inside the test container shows a running `agents-observe` container. Hard check.
+1. **Inner container exists** — `docker ps -a` inside the test container shows a running `koko-agents-observe` container. Hard check.
 2. **Server health** — `curl http://127.0.0.1:4981/api/health` returns 200 with `ok: true`. Hard check.
 3. **Events captured** — `curl http://127.0.0.1:4981/api/sessions/recent` returns at least one session. Hard check.
 4. **Error count in logs** — greps `ERROR` lines in `mcp.log` and `cli.log`. Soft check (reported, does not fail the run).
@@ -53,7 +53,7 @@ Read the diagnostic bundle from top to bottom:
 2. Did the server image load? (`Server image loaded successfully`.)
 3. Did `claude` run? (`claude exit code: 0` and some stdout.)
 4. Did the MCP server start? (`mcp.log` should show `Server started successfully`.)
-5. Is the server container running? (`docker ps -a` shows `agents-observe` Up.)
+5. Is the server container running? (`docker ps -a` shows `koko-agents-observe` Up.)
 6. Did hooks reach the server? (`cli.log` — early hooks may show `ECONNREFUSED` if they fire before the server starts; later hooks should succeed.)
 
 The first PASS/FAIL that doesn't match what you expect is the bug.

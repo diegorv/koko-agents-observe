@@ -11,7 +11,7 @@ import { mkdirSync, writeFileSync, rmSync, existsSync, readFileSync, utimesSync 
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
-const PLUGIN_NAME = 'agents-observe'
+const PLUGIN_NAME = 'koko-agents-observe'
 const DB_FILE = 'observe.db'
 
 // All env vars we override per-test. Snapshot/restore so the suite
@@ -124,7 +124,7 @@ describe('initLocalDataDirs — end-to-end migration', () => {
 
   it('migrates from plugin-data root (mispointed DATA_DIR in 0.9.8)', async () => {
     const { getConfig, initLocalDataDirs } = await loadConfig()
-    // The orphan: ~/.claude/plugins/data/agents-observe/observe.db
+    // The orphan: ~/.claude/plugins/data/koko-agents-observe/observe.db
     // (no /data subdir — exactly the layout on Joe's machine).
     const legacy = join(testHome, '.claude/plugins/data', PLUGIN_NAME, DB_FILE)
     seedDb(legacy, 'legacy-mispointed')
@@ -137,7 +137,7 @@ describe('initLocalDataDirs — end-to-end migration', () => {
 
   it('migrates from sibling plugin-data dir (--plugin-dir leftover)', async () => {
     const { getConfig, initLocalDataDirs } = await loadConfig()
-    // The orphan: ~/.claude/plugins/data/agents-observe-inline/data/observe.db
+    // The orphan: ~/.claude/plugins/data/koko-agents-observe-inline/data/observe.db
     const legacy = join(testHome, '.claude/plugins/data', `${PLUGIN_NAME}-inline`, 'data', DB_FILE)
     seedDb(legacy, 'legacy-inline')
 
@@ -147,7 +147,7 @@ describe('initLocalDataDirs — end-to-end migration', () => {
     expect(readFileSync(join(config.dataDir, DB_FILE), 'utf8')).toBe('legacy-inline')
   })
 
-  it('migrates from legacy ~/.agents-observe fallback dir', async () => {
+  it('migrates from legacy ~/.koko-agents-observe fallback dir', async () => {
     const { getConfig, initLocalDataDirs } = await loadConfig()
     const legacy = join(testHome, `.${PLUGIN_NAME}/data`, DB_FILE)
     seedDb(legacy, 'legacy-home')

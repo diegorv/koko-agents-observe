@@ -25,7 +25,7 @@ default:
 
 # Build the Docker image locally
 build:
-    docker build -t agents-observe:local .
+    docker build -t koko-agents-observe:local .
 
 # Start server (same path as plugin MCP)
 start:

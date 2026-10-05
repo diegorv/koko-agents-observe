@@ -1,12 +1,12 @@
-# Agents Observe
+# Koko Agents Observe
 
 Real-time observability dashboard for Claude Code agents. Captures every hook event and streams it to a live dashboard.
 
 ## Install as Plugin
 
 ```bash
-claude plugin marketplace add simple10/agents-observe
-claude plugin install agents-observe
+claude plugin marketplace add diegorv/koko-agents-observe
+claude plugin install koko-agents-observe
 ```
 
 Restart Claude Code. The server auto-starts as a Docker container and the dashboard is at **http://localhost:4981**.
@@ -30,8 +30,8 @@ Restart Claude Code. The server auto-starts as a Docker container and the dashbo
 Requires [just](https://github.com/casey/just), [Node.js](https://nodejs.org/), and [Docker](https://www.docker.com/).
 
 ```bash
-git clone https://github.com/simple10/agents-observe.git
-cd agents-observe
+git clone https://github.com/diegorv/koko-agents-observe.git
+cd koko-agents-observe
 just install   # install dependencies
 just start     # start server via Docker
 ```

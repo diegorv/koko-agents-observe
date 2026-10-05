@@ -373,7 +373,7 @@ interface UIState {
   setLatestVersion: (version: string) => void
 }
 
-const PINNED_STORAGE_KEY = 'agents-observe-pinned-sessions'
+const PINNED_STORAGE_KEY = 'koko-agents-observe-pinned-sessions'
 
 function loadPinnedSessions(): Set<string> {
   try {
@@ -388,8 +388,8 @@ function savePinnedSessions(ids: Set<string>) {
   localStorage.setItem(PINNED_STORAGE_KEY, JSON.stringify([...ids]))
 }
 
-const LABELS_STORAGE_KEY = 'agents-observe-labels'
-const LABEL_MEMBERSHIP_STORAGE_KEY = 'agents-observe-label-memberships'
+const LABELS_STORAGE_KEY = 'koko-agents-observe-labels'
+const LABEL_MEMBERSHIP_STORAGE_KEY = 'koko-agents-observe-label-memberships'
 
 function loadLabels(): Label[] {
   try {
@@ -699,9 +699,10 @@ export const useUIStore = create<UIState>((set, get) => ({
   },
 
   sidebarTab:
-    (localStorage.getItem('agents-observe-sidebar-tab') as 'projects' | 'labels') || 'projects',
+    (localStorage.getItem('koko-agents-observe-sidebar-tab') as 'projects' | 'labels') ||
+    'projects',
   setSidebarTab: (tab) => {
-    localStorage.setItem('agents-observe-sidebar-tab', tab)
+    localStorage.setItem('koko-agents-observe-sidebar-tab', tab)
     set({ sidebarTab: tab })
   },
 
@@ -709,25 +710,25 @@ export const useUIStore = create<UIState>((set, get) => ({
   // Remember the last tab the user viewed so the gear icon reopens
   // there. Fall back to 'settings' (Display) since that's the leftmost
   // tab in the modal.
-  settingsTab: localStorage.getItem('agents-observe-settings-tab') || 'settings',
+  settingsTab: localStorage.getItem('koko-agents-observe-settings-tab') || 'settings',
   openSettings: (tab) => {
     if (tab) {
-      localStorage.setItem('agents-observe-settings-tab', tab)
+      localStorage.setItem('koko-agents-observe-settings-tab', tab)
       set({ settingsOpen: true, settingsTab: tab })
     } else {
       set({ settingsOpen: true })
     }
   },
   setSettingsTab: (tab) => {
-    localStorage.setItem('agents-observe-settings-tab', tab)
+    localStorage.setItem('koko-agents-observe-settings-tab', tab)
     set({ settingsTab: tab })
   },
   closeSettings: () => set({ settingsOpen: false }),
 
-  lastFilterId: localStorage.getItem('agents-observe-last-filter-id') || null,
+  lastFilterId: localStorage.getItem('koko-agents-observe-last-filter-id') || null,
   setLastFilterId: (id) => {
-    if (id) localStorage.setItem('agents-observe-last-filter-id', id)
-    else localStorage.removeItem('agents-observe-last-filter-id')
+    if (id) localStorage.setItem('koko-agents-observe-last-filter-id', id)
+    else localStorage.removeItem('koko-agents-observe-last-filter-id')
     set({ lastFilterId: id })
   },
 
@@ -740,31 +741,31 @@ export const useUIStore = create<UIState>((set, get) => ({
       lastExpandedEventId: enabled ? null : s.lastExpandedEventId,
     })),
 
-  dedupEnabled: localStorage.getItem('agents-observe-dedup') !== 'off',
+  dedupEnabled: localStorage.getItem('koko-agents-observe-dedup') !== 'off',
   setDedupEnabled: (enabled) => {
-    localStorage.setItem('agents-observe-dedup', enabled ? 'on' : 'off')
+    localStorage.setItem('koko-agents-observe-dedup', enabled ? 'on' : 'off')
     window.location.reload()
   },
 
-  notificationsEnabled: localStorage.getItem('agents-observe-notifications') !== 'off',
+  notificationsEnabled: localStorage.getItem('koko-agents-observe-notifications') !== 'off',
   setNotificationsEnabled: (enabled) => {
-    localStorage.setItem('agents-observe-notifications', enabled ? 'on' : 'off')
+    localStorage.setItem('koko-agents-observe-notifications', enabled ? 'on' : 'off')
     set({ notificationsEnabled: enabled })
   },
 
-  activeIndicatorEnabled: localStorage.getItem('agents-observe-active-indicator') !== 'off',
+  activeIndicatorEnabled: localStorage.getItem('koko-agents-observe-active-indicator') !== 'off',
   setActiveIndicatorEnabled: (enabled) => {
-    localStorage.setItem('agents-observe-active-indicator', enabled ? 'on' : 'off')
+    localStorage.setItem('koko-agents-observe-active-indicator', enabled ? 'on' : 'off')
     set({ activeIndicatorEnabled: enabled })
   },
 
   activeIndicatorSeconds: (() => {
-    const raw = localStorage.getItem('agents-observe-active-indicator-seconds')
+    const raw = localStorage.getItem('koko-agents-observe-active-indicator-seconds')
     const n = raw != null ? Number(raw) : NaN
     return Number.isFinite(n) && n > 0 ? n : ACTIVITY_CONFIG.pulseDurationMs / 1000
   })(),
   setActiveIndicatorSeconds: (seconds) => {
-    localStorage.setItem('agents-observe-active-indicator-seconds', String(seconds))
+    localStorage.setItem('koko-agents-observe-active-indicator-seconds', String(seconds))
     set({ activeIndicatorSeconds: seconds })
   },
 
@@ -791,9 +792,9 @@ export const useUIStore = create<UIState>((set, get) => ({
   // Default to the constellation view on a fresh load; an explicit prior choice
   // (incl. 'sessions-list') persists via localStorage. Keep the id literal to
   // avoid importing the dashboard registry into the store (circular).
-  dashboardThemeId: localStorage.getItem('agents-observe-dashboard-theme') || 'constellation',
+  dashboardThemeId: localStorage.getItem('koko-agents-observe-dashboard-theme') || 'constellation',
   setDashboardThemeId: (id) => {
-    localStorage.setItem('agents-observe-dashboard-theme', id)
+    localStorage.setItem('koko-agents-observe-dashboard-theme', id)
     set({ dashboardThemeId: id })
   },
 
@@ -864,7 +865,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   },
   labelsModalScrollToId: null,
   openLabelsModal: (scrollToLabelId) => {
-    localStorage.setItem('agents-observe-settings-tab', 'labels')
+    localStorage.setItem('koko-agents-observe-settings-tab', 'labels')
     set({
       settingsOpen: true,
       settingsTab: 'labels',

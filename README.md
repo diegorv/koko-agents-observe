@@ -1,4 +1,6 @@
-# Agents Observe
+# Koko Agents Observe
+
+> Based on [simple10/agents-observe](https://github.com/simple10/agents-observe) by Joe Johnston (MIT).
 
 Real-time observability dashboard for Claude Code and Codex agents.
 
@@ -15,13 +17,13 @@ Includes powerful filtering, searching, and visualization of multi-agent session
 </p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/simple10/agents-observe/main/docs/assets/dashboard2.png" alt="Agents Observe Dashboard Screenshot - Expanded Row" />
+  <img src="https://raw.githubusercontent.com/diegorv/koko-agents-observe/main/docs/assets/dashboard2.png" alt="Agents Observe Dashboard Screenshot - Expanded Row" />
 </p>
 
 > Version 0.9.7 adds token usage and cost breakdowns in session stats.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/simple10/agents-observe/main/docs/assets/session-token-usage1.png" alt="Agents Observe Session Token Usage" />
+  <img src="https://raw.githubusercontent.com/diegorv/koko-agents-observe/main/docs/assets/session-token-usage1.png" alt="Agents Observe Session Token Usage" />
 </p>
 
 ## Quick Start
@@ -30,10 +32,10 @@ Install as a `claude code` plugin:
 
 ```bash
 # Add this repo as a marketplace
-claude plugin marketplace add simple10/agents-observe
+claude plugin marketplace add diegorv/koko-agents-observe
 
 # Install the plugin
-claude plugin install agents-observe
+claude plugin install koko-agents-observe
 
 # Then just run claude
 # The plugin will auto start the MCP server and capture events
@@ -57,9 +59,9 @@ By default, the SQLite DB and logs live under:
 
 - `$CLAUDE_PLUGIN_DATA` when running as a Claude plugin. Claude Code names this dir
   `<plugin>-<marketplace>` — so a marketplace install lands at
-  `~/.claude/plugins/data/agents-observe-agents-observe/`, and a `--plugin-dir`
-  install lands at `~/.claude/plugins/data/agents-observe-inline/`.
-- `~/.agents-observe/` when running outside Claude (Codex, manual CLI, dev).
+  `~/.claude/plugins/data/koko-agents-observe-koko-agents-observe/`, and a `--plugin-dir`
+  install lands at `~/.claude/plugins/data/koko-agents-observe-inline/`.
+- `~/.koko-agents-observe/` when running outside Claude (Codex, manual CLI, dev).
 
 The DB sits at `<root>/data/observe.db`, logs at `<root>/logs/`.
 
@@ -142,8 +144,8 @@ Claude Code Hooks  →  observe_cli.mjs  →  API Server (SQLite)  →  React Da
 ### 1. Clone and install dependencies
 
 ```bash
-git clone https://github.com/simple10/agents-observe.git agents-observe
-cd agents-observe
+git clone https://github.com/diegorv/koko-agents-observe.git koko-agents-observe
+cd koko-agents-observe
 
 # Install just if needed
 brew install just
@@ -165,7 +167,7 @@ Copy the hooks from `.claude/settings.json` into your project's settings.in this
 - **Project-level** (recommended): `.claude/settings.json` in your project root
 - **User-level** (all projects): `~/.claude/settings.json`
 
-Update the `$CLAUDE_PROJECT_DIR` paths to point to your agents-observe install location.
+Update the `$CLAUDE_PROJECT_DIR` paths to point to your koko-agents-observe install location.
 
 **Environment variables set in the config:**
 

@@ -3,8 +3,8 @@
 // One-shot migration of a legacy SQLite DB into the current dataDir.
 //
 // Before the #17 fix, the plugin sometimes stored observe.db under the
-// version-scoped install dir (~/.claude/plugins/cache/agents-observe/
-// agents-observe/<version>/data/data/observe.db). Each plugin upgrade
+// version-scoped install dir (~/.claude/plugins/cache/koko-agents-observe/
+// koko-agents-observe/<version>/data/data/observe.db). Each plugin upgrade
 // changed <version>, orphaning the old DB. This module scans those
 // legacy locations and copies the newest DB into the new stable
 // dataDir on first server start after upgrade.
@@ -59,7 +59,7 @@ export function scanLegacyDbCandidates(config) {
   }
 
   // Sibling plugin data dirs. Claude Code names these as
-  // `<plugin>-<marketplace>` (e.g. agents-observe-agents-observe) or
+  // `<plugin>-<marketplace>` (e.g. koko-agents-observe-koko-agents-observe) or
   // `<plugin>-inline` for --plugin-dir installs. After upgrades or env
   // changes a DB can be orphaned in one of them.
   const pluginsDataRoot = resolve(homeDir, '.claude/plugins/data')

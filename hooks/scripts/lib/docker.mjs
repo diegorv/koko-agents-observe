@@ -96,7 +96,7 @@ export function buildPortMapping(bindHost, hostPort, containerPort) {
 
 /**
  * Make sure the image is available before `docker run`. An image already
- * present locally is used as-is — locally built tags (e.g. `agents-observe:local`
+ * present locally is used as-is — locally built tags (e.g. `koko-agents-observe:local`
  * via AGENTS_OBSERVE_DOCKER_IMAGE) don't exist in any registry, so pulling them
  * would always fail. Otherwise pull. Skipped entirely in the test harness
  * (AGENTS_OBSERVE_TEST_SKIP_PULL=1). Returns false when the image is unavailable.

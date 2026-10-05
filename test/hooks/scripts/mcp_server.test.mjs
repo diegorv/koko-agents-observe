@@ -26,7 +26,7 @@ function handleMessage(msg) {
         protocolVersion: msg.params?.protocolVersion || '2024-11-05',
         capabilities: {},
         serverInfo: {
-          name: 'agents-observe',
+          name: 'koko-agents-observe',
           version: '0.8.0',
         },
       },
@@ -77,7 +77,7 @@ describe('MCP JSON-RPC protocol', () => {
       expect(resp.jsonrpc).toBe('2.0')
       expect(resp.id).toBe(0)
       expect(resp.result.protocolVersion).toBe('2025-11-25')
-      expect(resp.result.serverInfo.name).toBe('agents-observe')
+      expect(resp.result.serverInfo.name).toBe('koko-agents-observe')
       expect(resp.result.serverInfo.version).toBe('0.8.0')
       expect(resp.result.capabilities).toEqual({})
     })
@@ -168,7 +168,7 @@ describe('MCP JSON-RPC protocol', () => {
       handleMessage({ method: 'tools/list', jsonrpc: '2.0', id: 1 })
 
       expect(sent).toHaveLength(2) // initialize response + tools/list response
-      expect(sent[0].result.serverInfo.name).toBe('agents-observe')
+      expect(sent[0].result.serverInfo.name).toBe('koko-agents-observe')
       expect(sent[1].result.tools).toEqual([])
     })
   })

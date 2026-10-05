@@ -38,7 +38,7 @@ beforeEach(() => {
     savedEnv[k] = process.env[k]
     delete process.env[k]
   }
-  tmpHome = mkdtempSync(join(tmpdir(), 'agents-observe-test-home-'))
+  tmpHome = mkdtempSync(join(tmpdir(), 'koko-agents-observe-test-home-'))
   process.env.HOME = tmpHome
 })
 
@@ -82,9 +82,9 @@ describe('config', () => {
     expect(cfg.serverPort).toBe('8888')
   })
 
-  it('defaults containerName to agents-observe', async () => {
+  it('defaults containerName to koko-agents-observe', async () => {
     const cfg = await loadConfig()
-    expect(cfg.containerName).toBe('agents-observe')
+    expect(cfg.containerName).toBe('koko-agents-observe')
   })
 
   it('reads AGENTS_OBSERVE_DOCKER_CONTAINER_NAME', async () => {
@@ -98,14 +98,14 @@ describe('config', () => {
     expect(cfg.containerName).toBe('override-container')
   })
 
-  it('defaults API_ID to agents-observe', async () => {
+  it('defaults API_ID to koko-agents-observe', async () => {
     const cfg = await loadConfig()
-    expect(cfg.API_ID).toBe('agents-observe')
+    expect(cfg.API_ID).toBe('koko-agents-observe')
   })
 
-  it('defaults pluginName to agents-observe', async () => {
+  it('defaults pluginName to koko-agents-observe', async () => {
     const cfg = await loadConfig()
-    expect(cfg.pluginName).toBe('agents-observe')
+    expect(cfg.pluginName).toBe('koko-agents-observe')
   })
 
   it('exposes installDir as an absolute path', async () => {
@@ -198,7 +198,7 @@ describe('config', () => {
   })
 
   it('sets isPlugin true when CLAUDE_PLUGIN_DATA is set', async () => {
-    process.env.CLAUDE_PLUGIN_DATA = '/some/plugin/data/agents-observe'
+    process.env.CLAUDE_PLUGIN_DATA = '/some/plugin/data/koko-agents-observe'
     const cfg = await loadConfig()
     expect(cfg.isPlugin).toBe(true)
   })
@@ -222,26 +222,26 @@ describe('config', () => {
   })
 
   it('uses CLAUDE_PLUGIN_DATA for localDataRootDir when set correctly', async () => {
-    process.env.CLAUDE_PLUGIN_DATA = '/plugin/dir/agents-observe'
+    process.env.CLAUDE_PLUGIN_DATA = '/plugin/dir/koko-agents-observe'
     const cfg = await loadConfig()
-    expect(cfg.localDataRootDir).toBe('/plugin/dir/agents-observe')
-    expect(cfg.dataDir).toBe('/plugin/dir/agents-observe/data')
-    expect(cfg.logsDir).toBe('/plugin/dir/agents-observe/logs')
-    expect(cfg.serverPortFile).toBe('/plugin/dir/agents-observe/server-port')
+    expect(cfg.localDataRootDir).toBe('/plugin/dir/koko-agents-observe')
+    expect(cfg.dataDir).toBe('/plugin/dir/koko-agents-observe/data')
+    expect(cfg.logsDir).toBe('/plugin/dir/koko-agents-observe/logs')
+    expect(cfg.serverPortFile).toBe('/plugin/dir/koko-agents-observe/server-port')
   })
 
-  it('falls back to $HOME/.agents-observe when CLAUDE_PLUGIN_DATA points to wrong plugin', async () => {
+  it('falls back to $HOME/.koko-agents-observe when CLAUDE_PLUGIN_DATA points to wrong plugin', async () => {
     process.env.CLAUDE_PLUGIN_DATA = '/plugin/some-other-plugin/data'
     const cfg = await loadConfig()
-    expect(cfg.localDataRootDir).toBe(`${process.env.HOME}/.agents-observe`)
+    expect(cfg.localDataRootDir).toBe(`${process.env.HOME}/.koko-agents-observe`)
   })
 
-  it('defaults localDataRootDir to $HOME/.agents-observe when not a plugin', async () => {
+  it('defaults localDataRootDir to $HOME/.koko-agents-observe when not a plugin', async () => {
     // Pre-fix this fell back to installDir/data, which lives under the
     // version-scoped plugin cache dir and gets orphaned on every plugin
     // upgrade — see GitHub issue #17. The stable per-user path survives.
     const cfg = await loadConfig()
-    expect(cfg.localDataRootDir).toBe(`${process.env.HOME}/.agents-observe`)
+    expect(cfg.localDataRootDir).toBe(`${process.env.HOME}/.koko-agents-observe`)
   })
 
   it('flags usingDefaultDataDir true when AGENTS_OBSERVE_LOCAL_DATA_ROOT is unset', async () => {
@@ -315,9 +315,9 @@ describe('config', () => {
   it('constructs dockerImage from version', async () => {
     const cfg = await loadConfig()
     if (cfg.expectedVersion) {
-      expect(cfg.dockerImage).toBe(`ghcr.io/simple10/agents-observe:v${cfg.expectedVersion}`)
+      expect(cfg.dockerImage).toBe(`ghcr.io/diegorv/koko-agents-observe:v${cfg.expectedVersion}`)
     } else {
-      expect(cfg.dockerImage).toBe('ghcr.io/simple10/agents-observe:latest')
+      expect(cfg.dockerImage).toBe('ghcr.io/diegorv/koko-agents-observe:latest')
     }
   })
 
@@ -329,9 +329,9 @@ describe('config', () => {
 
   // --- Docker label ---
 
-  it('exposes dockerLabel with simple10 prefix', async () => {
+  it('exposes dockerLabel with diegorv prefix', async () => {
     const cfg = await loadConfig()
-    expect(cfg.dockerLabel).toBe('simple10-agents-observe.managed')
+    expect(cfg.dockerLabel).toBe('diegorv-koko-agents-observe.managed')
   })
 
   // --- Test skip pull ---

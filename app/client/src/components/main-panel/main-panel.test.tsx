@@ -104,7 +104,7 @@ describe('MainPanel routing', () => {
     // slug present, id not yet resolved, no session → don't flash HomePage.
     useUIStore.setState({
       selectedProjectId: null,
-      selectedProjectSlug: 'agents-observe',
+      selectedProjectSlug: 'koko-agents-observe',
       selectedSessionId: null,
     })
 

@@ -58,25 +58,25 @@ export function createLogger(filename, config) {
   return {
     error(msg) {
       writeToFile('ERROR', msg)
-      console.error(`[agents-observe] ${msg}`)
+      console.error(`[koko-agents-observe] ${msg}`)
     },
     warn(msg) {
       writeToFile('WARN', msg)
-      console.error(`[agents-observe] ${msg}`)
+      console.error(`[koko-agents-observe] ${msg}`)
     },
     info(msg) {
       if (verbose) writeToFile('INFO', msg)
-      console.error(`[agents-observe] ${msg}`)
+      console.error(`[koko-agents-observe] ${msg}`)
     },
     debug(msg) {
       if (!verbose) return
       writeToFile('DEBUG', msg)
-      console.error(`[agents-observe] ${msg}`)
+      console.error(`[koko-agents-observe] ${msg}`)
     },
     trace(msg) {
       if (!verbose) return
       writeToFile('TRACE', msg)
-      console.error(`[agents-observe] ${msg}`)
+      console.error(`[koko-agents-observe] ${msg}`)
     },
   }
 }

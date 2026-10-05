@@ -1,5 +1,5 @@
 # Fresh install test harness — test container image
-# Runs a nested dockerd so the plugin can start its agents-observe server
+# Runs a nested dockerd so the plugin can start its koko-agents-observe server
 # container in full isolation from the host.
 
 FROM docker:27-dind

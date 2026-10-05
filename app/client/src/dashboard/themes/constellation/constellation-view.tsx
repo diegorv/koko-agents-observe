@@ -28,10 +28,10 @@ import {
 import { Settings } from 'lucide-react'
 import './constellation.css'
 
-const PALETTE_STORAGE_KEY = 'agents-observe-constellation-palette'
-const WINDOW_STORAGE_KEY = 'agents-observe-constellation-window'
-const ZOOM_STORAGE_KEY = 'agents-observe-constellation-zoom'
-const COLLAPSED_STORAGE_KEY = 'agents-observe-constellation-collapsed'
+const PALETTE_STORAGE_KEY = 'koko-agents-observe-constellation-palette'
+const WINDOW_STORAGE_KEY = 'koko-agents-observe-constellation-window'
+const ZOOM_STORAGE_KEY = 'koko-agents-observe-constellation-zoom'
+const COLLAPSED_STORAGE_KEY = 'koko-agents-observe-constellation-collapsed'
 const DRAG_THRESH = 6 // px of movement before a press counts as a pan, not a click
 const BOUNDS_PAD = 140 // world-unit margin around content (star clamp + pan overscroll)
 const SMALL_WELL_R = 88 // wells below this only label on hover

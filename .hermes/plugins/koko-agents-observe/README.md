@@ -1,7 +1,7 @@
-# agents-observe — Hermes plugin
+# koko-agents-observe — Hermes plugin
 
 Fire-and-forget observability for Hermes. Ships every supported hook
-payload to an [agents-observe](https://github.com/simple10/agents-observe)
+payload to an [koko-agents-observe](https://github.com/diegorv/koko-agents-observe)
 HTTP backend so Hermes shows up in the same dashboard as Claude Code.
 
 **Pure observation.** Never mutates payloads, never blocks the agent. The
@@ -18,7 +18,7 @@ Copy the plugin to `~/.hermes/plugins` or where ever you have Hermes installed.
 Then enable it in Hermes:
 
 ```bash
-hermes plugins enable agents-observe
+hermes plugins enable koko-agents-observe
 ```
 
 Or check the box in the interactive `hermes plugins` UI.
@@ -32,7 +32,7 @@ Set in `~/.hermes/.env`:
 HERMES_AGENTS_OBSERVE_URL=http://localhost:4981
 ```
 
-`HERMES_AGENTS_OBSERVE_URL` should point at wherever `agents-observe` is
+`HERMES_AGENTS_OBSERVE_URL` should point at wherever `koko-agents-observe` is
 serving its API. The Agents Observe backend must already be running.
 
 The plugin is **inert** when `HERMES_AGENTS_OBSERVE_URL` is unset — `register()`
@@ -66,7 +66,7 @@ For every fired hook, a single JSON POST to
 }
 ```
 
-Mirrors the agents-observe Claude Code envelope so the existing dashboard
+Mirrors the koko-agents-observe Claude Code envelope so the existing dashboard
 ingests both without a server-side change.
 
 ### Hooks observed (17)
@@ -103,19 +103,19 @@ Anything still unserializable falls back through `json.dumps(default=repr)`.
 ## Verify
 
 ```bash
-hermes plugins list        # agents-observe → enabled
+hermes plugins list        # koko-agents-observe → enabled
 hermes chat -q "hello"     # fires pre_llm_call, etc.
 open http://localhost:4981 # events should appear
 ```
 
 If nothing arrives, set `HERMES_AGENTS_OBSERVE_DEBUG=true`, restart the
-Agents Observe server, and check the Hermes logs for `agents-observe:` lines — POST
+Agents Observe server, and check the Hermes logs for `koko-agents-observe:` lines — POST
 errors are logged at INFO when debug is on.
 
 ## Disable
 
 ```bash
-hermes plugins disable agents-observe
+hermes plugins disable koko-agents-observe
 ```
 
 Or unset `HERMES_AGENTS_OBSERVE_URL` — the plugin is inert without it.

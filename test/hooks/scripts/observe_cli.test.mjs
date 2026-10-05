@@ -347,7 +347,7 @@ describe('observe_cli', () => {
           status: 200,
           body: {
             ok: true,
-            id: 'agents-observe',
+            id: 'koko-agents-observe',
             version: '0.8.0',
             runtime: 'docker',
             logLevel: 'debug',

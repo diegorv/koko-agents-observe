@@ -90,7 +90,7 @@ function handleMessage(msg) {
         protocolVersion: msg.params?.protocolVersion || '2024-11-05',
         capabilities: {},
         serverInfo: {
-          name: 'agents-observe',
+          name: 'koko-agents-observe',
           version: config.expectedVersion || '0.0.0',
         },
       },

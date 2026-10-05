@@ -164,7 +164,7 @@ function logsServerCommand() {
 /**
  * Tail a log file from config.logsDir. Resolves the path itself so the
  * /observe skill doesn't have to probe ~/.claude/plugins/data/... and
- * ~/.agents-observe/... fallbacks.
+ * ~/.koko-agents-observe/... fallbacks.
  */
 function logsFileCommand(filename) {
   const path = resolve(config.logsDir, filename)

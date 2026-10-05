@@ -318,7 +318,7 @@ describe('SqliteAdapter — sessions', () => {
   })
 
   test('v1→v2 rebuild backfills start_cwd from metadata.cwd', async () => {
-    const tmpPath = `${tmpdir()}/agents-observe-rebuild-${Date.now()}-${Math.random()}.db`
+    const tmpPath = `${tmpdir()}/koko-agents-observe-rebuild-${Date.now()}-${Math.random()}.db`
     try {
       // Build a fake v1-shape sessions table directly so the constructor's
       // table-rebuild fires (gated by sessionsHasStatus). The rebuild

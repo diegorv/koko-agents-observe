@@ -6,12 +6,12 @@ describe('resolveHostDbPath (issue #21)', () => {
   test('passes a Windows host path through verbatim (no container prefix)', () => {
     // Regression: resolve() inside the Linux container treated C:\... as
     // relative and produced /app/server/C:\Users\... on /api/health.
-    const win = 'C:\\Users\\me\\.agents-observe\\data\\observe.db'
+    const win = 'C:\\Users\\me\\.koko-agents-observe\\data\\observe.db'
     expect(resolveHostDbPath(win, '/data/observe.db')).toBe(win)
   })
 
   test('passes a POSIX host path through verbatim', () => {
-    const host = '/home/me/.agents-observe/data/observe.db'
+    const host = '/home/me/.koko-agents-observe/data/observe.db'
     expect(resolveHostDbPath(host, '/data/observe.db')).toBe(host)
   })
 

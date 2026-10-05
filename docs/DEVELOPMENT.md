@@ -1,6 +1,6 @@
 # Development Guide
 
-Detailed reference for developing agents-observe locally. For quick start, see [AGENTS.md](../AGENTS.md).
+Detailed reference for developing koko-agents-observe locally. For quick start, see [AGENTS.md](../AGENTS.md).
 
 ## Architecture
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Release script for agents-observe.
+# Release script for koko-agents-observe.
 # Bumps version, generates changelog via Claude, opens editor for review,
 # then commits, tags, and pushes.
 #
@@ -92,7 +92,7 @@ npm test
 
 echo ""
 echo "=== Building Docker image ==="
-docker build -t agents-observe:local .
+docker build -t koko-agents-observe:local .
 
 echo ""
 echo "=== Running fresh install test ==="
@@ -127,4 +127,4 @@ git push origin main "$TAG"
 echo ""
 echo "=== Released $TAG ==="
 echo "GitHub Actions will build the Docker image and create the GitHub release."
-echo "Watch: https://github.com/simple10/agents-observe/actions"
+echo "Watch: https://github.com/diegorv/koko-agents-observe/actions"
