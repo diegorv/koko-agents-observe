@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import type { EventStore } from '../storage/types'
 import type { Project } from '../types'
 import { apiError } from '../errors'
+import { safeParseJson } from '../utils/safe-parse-json'
 
 type Env = {
   Variables: {
@@ -83,7 +84,7 @@ router.get('/projects/:id/sessions', async (c) => {
     stoppedAt: r.stopped_at,
     transcriptPath: r.transcript_path || null,
     startCwd: r.start_cwd || null,
-    metadata: r.metadata ? JSON.parse(r.metadata) : null,
+    metadata: safeParseJson(r.metadata, `session ${r.id} metadata`),
     agentCount: r.agent_count,
     eventCount: r.event_count,
     lastActivity: r.last_activity,

@@ -3,6 +3,7 @@ import { Hono } from 'hono'
 import type { EventStore } from '../storage/types'
 import { config } from '../config'
 import { apiError } from '../errors'
+import { safeParseJson } from '../utils/safe-parse-json'
 
 function deriveSessionStatus(stoppedAt: number | null | undefined): string {
   return stoppedAt ? 'ended' : 'active'
@@ -37,7 +38,7 @@ function rowToRecentSession(r: any) {
     status: deriveSessionStatus(r.stopped_at),
     startedAt: r.started_at,
     stoppedAt: r.stopped_at,
-    metadata: r.metadata ? JSON.parse(r.metadata) : null,
+    metadata: safeParseJson(r.metadata, `session ${r.id} metadata`),
     agentCount: r.agent_count,
     eventCount: r.event_count,
     lastActivity: r.last_activity,
@@ -84,7 +85,7 @@ router.get('/sessions/:id', async (c) => {
     stoppedAt: row.stopped_at,
     transcriptPath: row.transcript_path || null,
     startCwd: row.start_cwd || null,
-    metadata: row.metadata ? JSON.parse(row.metadata) : null,
+    metadata: safeParseJson(row.metadata, `session ${row.id} metadata`),
     agentCount: row.agent_count,
     eventCount: row.event_count,
     lastActivity: row.last_activity,
@@ -151,12 +152,13 @@ router.get('/sessions/:id/events', async (c) => {
       agentId: r.agent_id,
       hookName: r.hook_name,
       timestamp: r.timestamp,
-      payload: JSON.parse(r.payload),
+      // Client assumes a non-null payload object.
+      payload: safeParseJson(r.payload, `event ${r.id} payload`) ?? {},
     }
     if (requested.has('sessionId')) base.sessionId = r.session_id
     if (requested.has('cwd')) base.cwd = r.cwd ?? null
     if (requested.has('createdAt')) base.createdAt = r.created_at ?? r.timestamp
-    if (requested.has('_meta')) base._meta = r._meta ? JSON.parse(r._meta) : null
+    if (requested.has('_meta')) base._meta = safeParseJson(r._meta, `event ${r.id} _meta`)
     return base
   })
 

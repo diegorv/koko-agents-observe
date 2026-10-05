@@ -119,6 +119,28 @@ describe('session routes — agentClasses response shape', () => {
     expect(body.agentClasses).toEqual(['claude-code', 'codex'])
   })
 
+  test('GET /api/sessions/:id returns null metadata for a corrupt metadata column', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    mockStore.getSessionById.mockResolvedValue({
+      id: 'sess1',
+      project_id: 1,
+      started_at: 1000,
+      stopped_at: null,
+      metadata: '{not-json',
+      agent_count: 0,
+      event_count: 0,
+      last_activity: 1000,
+      agent_classes: null,
+    })
+
+    const res = await app.request('/api/sessions/sess1')
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.metadata).toBeNull()
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
+  })
+
   test('GET /api/sessions/:id returns empty array when no agents have a class', async () => {
     mockStore.getSessionById.mockResolvedValue({
       id: 'sess1',
@@ -229,6 +251,62 @@ describe('GET /api/sessions/:id/events — fields= allow-list', () => {
         _meta: { foo: 'bar' },
       },
     ])
+  })
+
+  test('corrupt payload JSON falls back to {} instead of failing the endpoint', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    mockStore.getEventsForSession.mockResolvedValue([
+      {
+        id: 99,
+        agent_id: 'agent-1',
+        session_id: 'sess-1',
+        hook_name: 'PreToolUse',
+        timestamp: 1000,
+        _meta: null,
+        payload: '{not-json',
+      },
+      {
+        id: 100,
+        agent_id: 'agent-1',
+        session_id: 'sess-1',
+        hook_name: 'PostToolUse',
+        timestamp: 1001,
+        _meta: null,
+        payload: '{"ok":true}',
+      },
+    ])
+    mockStore.getSessionById.mockResolvedValue({ stopped_at: null })
+
+    const res = await app.request('/api/sessions/sess-1/events')
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body[0].payload).toEqual({})
+    expect(body[1].payload).toEqual({ ok: true })
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
+  })
+
+  test('corrupt _meta JSON in the opt-in field returns null _meta', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    mockStore.getEventsForSession.mockResolvedValue([
+      {
+        id: 1,
+        agent_id: 'agent-1',
+        session_id: 'sess-1',
+        hook_name: 'PreToolUse',
+        timestamp: 1000,
+        _meta: '{bad',
+        payload: '{}',
+      },
+    ])
+    mockStore.getSessionById.mockResolvedValue({ stopped_at: null })
+
+    const res = await app.request('/api/sessions/sess-1/events?fields=_meta')
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body[0]._meta).toBeNull()
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
   })
 
   test('unknown fields in fields= are ignored', async () => {
