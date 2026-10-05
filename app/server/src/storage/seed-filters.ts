@@ -154,7 +154,11 @@ export const SEED_FILTERS: SeedFilter[] = [
     display: 'primary',
     combinator: 'and',
     patterns: [
-      { target: 'hook', regex: '^(InstructionsLoaded|ConfigChange|CwdChanged|FileChanged)$' },
+      {
+        target: 'hook',
+        regex:
+          '^(InstructionsLoaded|ConfigChange|CwdChanged|FileChanged|DirectoryAdded|PreModelSwitch|PostModelSwitch)$',
+      },
     ],
     config: { color: '#6b7280' }, // gray
   },

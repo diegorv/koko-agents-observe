@@ -143,6 +143,11 @@ export function getEventSummary(
       return p.new_cwd || p.cwd || 'Directory changed'
     case 'FileChanged':
       return p.file_path ? relativePath(p.file_path, cwd) : 'File changed'
+    case 'DirectoryAdded':
+      return p.directory || 'Directory added'
+    case 'PreModelSwitch':
+    case 'PostModelSwitch':
+      return p.from_model && p.to_model ? `${p.from_model} → ${p.to_model}` : 'Model switch'
     case 'PreCompact':
       return 'Compacting context...'
     case 'PostCompact':

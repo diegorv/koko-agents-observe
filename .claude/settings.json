@@ -315,6 +315,39 @@
           }
         ]
       }
+    ],
+    "DirectoryAdded": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash $CLAUDE_PROJECT_DIR/hooks/scripts/hook.sh"
+          }
+        ]
+      }
+    ],
+    "PreModelSwitch": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash $CLAUDE_PROJECT_DIR/hooks/scripts/hook.sh"
+          }
+        ]
+      }
+    ],
+    "PostModelSwitch": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash $CLAUDE_PROJECT_DIR/hooks/scripts/hook.sh"
+          }
+        ]
+      }
     ]
   }
 }

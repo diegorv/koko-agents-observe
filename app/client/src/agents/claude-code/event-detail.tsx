@@ -728,6 +728,34 @@ function ToolDetail({
     )
   }
 
+  if (event.hookName === 'DirectoryAdded') {
+    return (
+      <div className="space-y-1">
+        {payload.directory && <DetailRow label="Directory" value={payload.directory as string} />}
+        {payload.source && <DetailRow label="Source" value={payload.source as string} />}
+      </div>
+    )
+  }
+
+  if (event.hookName === 'PreModelSwitch' || event.hookName === 'PostModelSwitch') {
+    return (
+      <div className="space-y-1">
+        {payload.from_model && <DetailRow label="From" value={payload.from_model as string} />}
+        {payload.to_model && <DetailRow label="To" value={payload.to_model as string} />}
+        {payload.source && <DetailRow label="Source" value={payload.source as string} />}
+        {typeof payload.context_tokens === 'number' && (
+          <DetailRow label="Context" value={`${payload.context_tokens} tokens`} />
+        )}
+        {typeof payload.estimated_cache_write_usd === 'number' && (
+          <DetailRow
+            label="Est. cache write"
+            value={`$${(payload.estimated_cache_write_usd as number).toFixed(4)}`}
+          />
+        )}
+      </div>
+    )
+  }
+
   if (event.hookName === 'UserPromptExpansion') {
     const expansionType = payload.expansion_type as string | undefined
     const commandName = payload.command_name as string | undefined
