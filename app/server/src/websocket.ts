@@ -11,6 +11,19 @@ const LOG_LEVEL = config.logLevel
 const clientSessions = new Map<WebSocket, string>()
 const allClients = new Set<WebSocket>()
 
+/** Parse an inbound WS frame. Returns null and logs a warning on parse
+ *  failure so malformed frames are visible in server logs rather than
+ *  silently dropped. */
+export function parseClientMessage(raw: string): WSClientMessage | null {
+  try {
+    return JSON.parse(raw) as WSClientMessage
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err)
+    console.warn(`[WS] dropped malformed client message: ${reason} (raw: ${raw.slice(0, 120)})`)
+    return null
+  }
+}
+
 export function attachWebSocket(server: Server) {
   const wss = new WebSocketServer({
     server,
@@ -35,9 +48,13 @@ export function attachWebSocket(server: Server) {
     console.log(`[WS] Client connected (${allClients.size} total)`)
 
     ws.on('message', (raw) => {
+      const msg = parseClientMessage(raw.toString())
+      if (!msg) return
       try {
-        const msg: WSClientMessage = JSON.parse(raw.toString())
-        if (msg.type === 'subscribe' && msg.sessionId) {
+        // Frames are untrusted: a non-string sessionId (e.g. a number) would
+        // throw on .slice() below. The try/catch is a last line of defense so a
+        // handler bug is logged instead of crashing the process.
+        if (msg.type === 'subscribe' && typeof msg.sessionId === 'string' && msg.sessionId) {
           const prev = clientSessions.get(ws)
           clientSessions.set(ws, msg.sessionId)
           if (LOG_LEVEL === 'debug' || LOG_LEVEL === 'trace') {
@@ -53,7 +70,9 @@ export function attachWebSocket(server: Server) {
             )
           }
         }
-      } catch {}
+      } catch (err) {
+        console.warn('[WS] client message handler failed:', err)
+      }
     })
 
     ws.on('close', () => {
