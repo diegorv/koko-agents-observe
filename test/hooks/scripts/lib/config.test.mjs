@@ -396,9 +396,9 @@ describe('config', () => {
 
   // --- shutdownDelayMs ---
 
-  it('defaults shutdownDelayMs to 30 minutes', async () => {
+  it('defaults shutdownDelayMs to 5 minutes', async () => {
     const cfg = await loadConfig()
-    expect(cfg.shutdownDelayMs).toBe(1800000)
+    expect(cfg.shutdownDelayMs).toBe(300000)
   })
 
   it('reads AGENTS_OBSERVE_SHUTDOWN_DELAY_MS', async () => {

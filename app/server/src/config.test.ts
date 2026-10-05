@@ -71,10 +71,10 @@ describe('config.shutdownDelayMs default', () => {
     vi.resetModules()
   })
 
-  test('defaults to 30 minutes when unset', async () => {
+  test('defaults to 5 minutes when unset', async () => {
     vi.stubEnv('AGENTS_OBSERVE_SHUTDOWN_DELAY_MS', '')
     vi.resetModules()
     const { config } = await import('./config')
-    expect(config.shutdownDelayMs).toBe(1_800_000)
+    expect(config.shutdownDelayMs).toBe(300_000)
   })
 })

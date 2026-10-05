@@ -30,9 +30,9 @@ export function getConfig(overrides = {}) {
   const runtime = overrides.runtime || process.env.AGENTS_OBSERVE_RUNTIME || 'docker'
   /** True when running in dev mode (hot reload, vite client) */
   const isDevRuntime = runtime === 'dev'
-  /** Shutdown delay in ms. 0 or negative disables auto-shutdown. Default 30min. */
+  /** Shutdown delay in ms. 0 or negative disables auto-shutdown. Default 5min. */
   const shutdownDelayMs = parseInt(
-    overrides.shutdownDelayMs || process.env.AGENTS_OBSERVE_SHUTDOWN_DELAY_MS || '1800000',
+    overrides.shutdownDelayMs || process.env.AGENTS_OBSERVE_SHUTDOWN_DELAY_MS || '300000',
     10,
   )
 
