@@ -167,9 +167,11 @@ Not every feature needs a dedicated plan — small, self-contained changes can s
 ## Releasing
 
 ```bash
-scripts/release.sh <version>        # full release
-scripts/release.sh --dry-run <version>  # test without committing
+scripts/release.sh [patch|minor|major|X.Y.Z]            # full release (default: patch)
+scripts/release.sh --dry-run [patch|minor|major|X.Y.Z]  # test without committing
 ```
+
+The new version is computed from the `VERSION` file (the source of truth), not from git tags: `patch` bumps `1.2.0 → 1.2.1`, `minor` → `1.3.0`, `major` → `2.0.0`, and an explicit `X.Y.Z` is used as-is.
 
 The release script generates a CHANGELOG.md entry via Claude, opens it in your editor for review, runs tests, builds the Docker image, runs the fresh install test harness, then commits, tags, and pushes. GitHub Actions builds the multi-arch image and creates the release.
 

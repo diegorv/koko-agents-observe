@@ -3,31 +3,61 @@
 # Bumps version, generates changelog via Claude, opens editor for review,
 # then commits, tags, and pushes.
 #
-# Usage: scripts/release.sh [--dry-run] <version>
-#   e.g.  scripts/release.sh 0.8.0
-#         scripts/release.sh --dry-run 0.8.0
+# The base version is read from the VERSION file (source of truth).
+#
+# Usage: scripts/release.sh [--dry-run] [patch|minor|major|X.Y.Z]
+#   e.g.  scripts/release.sh            # 1.2.0 → 1.2.1 (patch is the default)
+#         scripts/release.sh minor      # 1.2.0 → 1.3.0
+#         scripts/release.sh major      # 1.2.0 → 2.0.0
+#         scripts/release.sh 1.4.0      # explicit version
+#         scripts/release.sh --dry-run minor
 
 set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
 
+USAGE="Usage: scripts/release.sh [--dry-run] [patch|minor|major|X.Y.Z]"
+
 DRY_RUN=false
-VERSION=""
+BUMP="patch"
 for arg in "$@"; do
   case "$arg" in
     --dry-run) DRY_RUN=true ;;
-    *) VERSION="$arg" ;;
+    -h|--help) echo "$USAGE"; exit 0 ;;
+    *) BUMP="${arg#v}" ;;
   esac
 done
 
-if [ -z "$VERSION" ]; then
-  echo "Usage: scripts/release.sh [--dry-run] <version>  (e.g. 0.8.0)"
+# ── Compute version from VERSION file ───────────────────
+
+SEMVER_RE='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'  # no leading zeros (bash arithmetic would read them as octal)
+
+CURRENT="$(tr -d '[:space:]' < VERSION)"
+if ! [[ "$CURRENT" =~ $SEMVER_RE ]]; then
+  echo "Error: VERSION file contains '$CURRENT', expected X.Y.Z"
   exit 1
 fi
+IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
 
-# Normalize: strip leading "v", then build tag
-VERSION="${VERSION#v}"
+case "$BUMP" in
+  patch) VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))" ;;
+  minor) VERSION="${MAJOR}.$((MINOR + 1)).0" ;;
+  major) VERSION="$((MAJOR + 1)).0.0" ;;
+  *)
+    if ! [[ "$BUMP" =~ $SEMVER_RE ]]; then
+      echo "Error: unknown argument '$BUMP'"
+      echo "$USAGE"
+      exit 1
+    fi
+    VERSION="$BUMP"
+    ;;
+esac
+
 TAG="v${VERSION}"
+
+echo ""
+echo "  v${CURRENT} → ${TAG} (${BUMP})"
+echo ""
 
 if git rev-parse "$TAG" >/dev/null 2>&1; then
   echo "Error: tag $TAG already exists"

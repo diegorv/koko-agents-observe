@@ -100,9 +100,9 @@ bundle-visualizer:
 fmt:
     npm run fmt
 
-# Tag and push a release (bumps versions, tests, builds, tags, pushes)
-release version:
-    {{ project_root }}/scripts/release.sh {{ version }}
+# Tag and push a release (bump: patch|minor|major|X.Y.Z, based on VERSION file)
+release bump="patch":
+    {{ project_root }}/scripts/release.sh {{ bump }}
 
 # Install all dependencies
 install:
