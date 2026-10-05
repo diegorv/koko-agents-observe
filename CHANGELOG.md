@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.0.1 — MCP server path fix
+
+### Fixes
+
+- Fix the plugin's MCP server failing with "Connection closed": `.mcp.json` now uses `${CLAUDE_PLUGIN_ROOT}` directly. The `${CLAUDE_PLUGIN_ROOT:-.}` fallback resolved to the session's working directory instead of the plugin root.
+
 ## v1.0.0 — Koko Agents Observe
 
 First release under the new name. The project is now developed independently as `koko-agents-observe`, based on [simple10/agents-observe](https://github.com/simple10/agents-observe) v0.9.12.
