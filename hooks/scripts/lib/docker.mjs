@@ -336,7 +336,8 @@ async function waitForHealth(config, port, log) {
 /**
  * Stops the Docker container and cleans up the port file.
  * Container is stopped but NOT removed — it can be fast-restarted
- * on next startServer call if the version hasn't changed.
+ * on next startServer call if the version hasn't changed
+ * (restartServer removes it instead).
  */
 export async function stopServer(config, log = console) {
   log.info('Stopping server...')
@@ -351,4 +352,16 @@ export async function stopServer(config, log = console) {
     }
   }
   removeServerPortFile(config)
+}
+
+/**
+ * Restarts the server for real: stops and removes our container, then starts
+ * a fresh one. startServer alone is a no-op while the server is healthy and
+ * `docker start`s a stopped container as-is, so changed env config or a
+ * rebuilt local image would never be picked up.
+ */
+export async function restartServer(config, log = console) {
+  await stopServer(config, log)
+  await safeRemoveContainer(config, log)
+  return await startServer(config, log)
 }

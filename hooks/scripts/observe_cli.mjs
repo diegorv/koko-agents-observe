@@ -10,7 +10,7 @@ import { resolve } from 'node:path'
 import { getConfig } from './lib/config.mjs'
 import { getJson } from './lib/http.mjs'
 import { createLogger } from './lib/logger.mjs'
-import { startServer, stopServer } from './lib/docker.mjs'
+import { startServer, stopServer, restartServer } from './lib/docker.mjs'
 import { removeDatabase } from './lib/fs.mjs'
 import { hookCommand, hookSyncCommand, hookAutostartCommand } from './lib/hooks.mjs'
 
@@ -52,7 +52,7 @@ switch (cliArgs.commands[0] || 'help') {
     stopCommand()
     break
   case 'restart':
-    startCommand('Restarting server...')
+    startCommand('Restarting server...', restartServer)
     break
   case 'db-reset':
     dbResetCommand()
@@ -131,9 +131,9 @@ async function healthCommand(exit = true) {
   }
 }
 
-async function startCommand(msg = 'Starting server...') {
+async function startCommand(msg = 'Starting server...', start = startServer) {
   log.info(msg)
-  const actualPort = await startServer(config, log)
+  const actualPort = await start(config, log)
   if (actualPort) {
     await healthCommand(false)
     console.log(`\nServer started on port ${actualPort}`)

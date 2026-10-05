@@ -102,7 +102,7 @@ Use the `/observe debug` claude command to help troubleshoot and fix installatio
 | `/observe status` | Show server health, version, runtime, and config details |
 | `/observe start` | Start the server |
 | `/observe stop` | Stop the server |
-| `/observe restart` | Restart the MCP server |
+| `/observe restart` | Restart the server (stops and recreates the container) |
 | `/observe logs` | Show recent Docker container logs |
 | `/observe debug` | Diagnose server issues (health, docker logs, mcp.log, cli.log) |
 

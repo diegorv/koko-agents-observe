@@ -1,11 +1,27 @@
 // test/hooks/scripts/lib/docker.test.mjs
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { execFile } from 'node:child_process'
+import { getJson } from '../../../../hooks/scripts/lib/http.mjs'
 import {
   buildPortMapping,
   buildTranscriptMounts,
   buildDataMount,
   ensureImage,
+  restartServer,
 } from '../../../../hooks/scripts/lib/docker.mjs'
+
+// restartServer drives docker via execFile and polls /health via getJson —
+// both are mocked below (only the restartServer tests use them).
+vi.mock('node:child_process', () => ({ execFile: vi.fn() }))
+vi.mock('../../../../hooks/scripts/lib/http.mjs', () => ({ getJson: vi.fn() }))
+vi.mock('../../../../hooks/scripts/lib/config.mjs', () => ({
+  initLocalDataDirs: vi.fn(),
+  getServerEnv: () => ({ AGENTS_OBSERVE_SERVER_PORT: '4981' }),
+}))
+vi.mock('../../../../hooks/scripts/lib/fs.mjs', () => ({
+  saveServerPortFile: vi.fn(),
+  removeServerPortFile: vi.fn(),
+}))
 
 describe('buildPortMapping (issue #22)', () => {
   it('prefixes the loopback bind host by default', () => {
@@ -168,5 +184,99 @@ describe('ensureImage', () => {
     const { exec, calls } = fakeExec({})
     expect(await ensureImage({ dockerImage: image, testSkipPull: true }, log, exec)).toBe(true)
     expect(calls).toEqual([])
+  })
+})
+
+describe('restartServer', () => {
+  const log = { info() {}, warn() {}, error() {} }
+  const config = {
+    API_ID: 'koko-agents-observe',
+    apiBaseUrl: 'http://127.0.0.1:4981/api',
+    containerName: 'koko-agents-observe',
+    dockerLabel: 'koko-agents-observe',
+    dockerImage: 'koko-agents-observe:local',
+    expectedVersion: '1.2.0',
+    serverPort: 4981,
+    serverBindHost: '127.0.0.1',
+    dataDir: '/tmp/koko-test/data',
+  }
+
+  // Stateful fake docker: one container (ours) that is running or stopped.
+  // /health answers OK only while the fake container is running.
+  let container
+  let calls
+
+  beforeEach(() => {
+    calls = []
+    execFile.mockImplementation((cmd, args, opts, cb) => {
+      calls.push(args.slice(0, 2).join(' '))
+      const ok = (stdout = '') => cb(null, stdout, '')
+      const fail = (stderr = 'error') =>
+        cb(Object.assign(new Error(stderr), { code: 1 }), '', stderr)
+      const [sub] = args
+      if (sub === 'info') return ok()
+      if (sub === 'image') return ok()
+      if (sub === 'inspect') {
+        if (!container) return fail('No such container')
+        const format = args[2] || ''
+        if (format.includes('Labels')) return ok(container.label)
+        if (format.includes('State.Running')) return ok(String(container.running))
+        return ok('[]')
+      }
+      if (sub === 'stop') {
+        if (container) container.running = false
+        return ok()
+      }
+      if (sub === 'rm') {
+        container = null
+        return ok()
+      }
+      if (sub === 'start') {
+        container.running = true
+        return ok()
+      }
+      if (sub === 'run') {
+        container = { label: config.expectedVersion, running: true }
+        return ok('new-container-id')
+      }
+      return fail(`unexpected docker ${sub}`)
+    })
+    getJson.mockImplementation(async () =>
+      container?.running
+        ? { status: 200, body: { ok: true, id: config.API_ID, version: config.expectedVersion } }
+        : { status: 0, error: 'connection refused' },
+    )
+  })
+
+  it('recreates a healthy running container instead of reporting "already running"', async () => {
+    container = { label: config.expectedVersion, running: true }
+    expect(await restartServer(config, log)).toBe(4981)
+    expect(calls).toContain('stop koko-agents-observe')
+    expect(calls).toContain('rm -f')
+    expect(calls).toContain('run -d')
+    expect(calls.indexOf('rm -f')).toBeLessThan(calls.indexOf('run -d'))
+  })
+
+  it('does not reuse a stopped container via docker start', async () => {
+    container = { label: config.expectedVersion, running: false }
+    expect(await restartServer(config, log)).toBe(4981)
+    expect(calls).toContain('rm -f')
+    expect(calls).toContain('run -d')
+    expect(calls).not.toContain('start koko-agents-observe')
+  })
+
+  it('starts fresh when no container exists', async () => {
+    container = null
+    expect(await restartServer(config, log)).toBe(4981)
+    expect(calls).not.toContain('rm -f')
+    expect(calls).toContain('run -d')
+  })
+
+  it('leaves a container it does not manage alone', async () => {
+    container = { label: '', running: true }
+    expect(await restartServer(config, log)).toBe('4981')
+    expect(calls).not.toContain('stop koko-agents-observe')
+    expect(calls).not.toContain('rm -f')
+    expect(calls).not.toContain('run -d')
   })
 })
