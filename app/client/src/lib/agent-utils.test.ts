@@ -6,6 +6,7 @@ import {
   getAgentColorById,
   isBackgroundLane,
   orderAgentLanes,
+  splitLanes,
 } from './agent-utils'
 import type { Agent } from '@/types'
 
@@ -217,5 +218,51 @@ describe('orderAgentLanes', () => {
   it('still places the lane after Main when Main is absent', () => {
     const ordered = orderAgentLanes([subA, lane], [])
     expect(ordered.map((o) => o.agent.id)).toEqual(['sess-1:background', 'sub-a'])
+  })
+})
+
+describe('splitLanes', () => {
+  const now = Date.now()
+  const main = makeAgent({ id: 'sess-1', parentAgentId: null, status: 'stopped' })
+  // use-agents falls back to the session root as parent for every
+  // non-root agent, so the background lane is NOT parentless in practice.
+  const lane = makeAgent({
+    id: 'sess-1:background',
+    parentAgentId: 'sess-1',
+    name: 'Background',
+    status: 'stopped',
+  })
+  const runA = makeAgent({ id: 'run-a', parentAgentId: 'sess-1' })
+  const runB = makeAgent({ id: 'run-b', parentAgentId: 'sess-1' })
+  const endA = makeAgent({ id: 'end-a', parentAgentId: 'sess-1', status: 'stopped' })
+  const endB = makeAgent({ id: 'end-b', parentAgentId: 'sess-1', status: 'stopped' })
+  const ids = (xs: { agent: Agent }[]) => xs.map((x) => x.agent.id)
+
+  it('pins Main and the background lane on top even when stopped', () => {
+    const { top, ended } = splitLanes(orderAgentLanes([main, lane, endA], []), now)
+    expect(ids(top)).toEqual(['sess-1', 'sess-1:background'])
+    expect(ids(ended)).toEqual(['end-a'])
+  })
+
+  it('keeps the newest-first order from orderAgentLanes within each group', () => {
+    const ordered = orderAgentLanes([main, runA, endA, runB, endB], [])
+    const { top, ended } = splitLanes(ordered, now)
+    expect(ids(top)).toEqual(['sess-1', 'run-b', 'run-a'])
+    expect(ids(ended)).toEqual(['end-b', 'end-a'])
+  })
+
+  it('moves only the agent that stopped', () => {
+    const before = splitLanes(orderAgentLanes([main, runA, runB], []), now)
+    const runAStopped = { ...runA, status: 'stopped' as const }
+    const after = splitLanes(orderAgentLanes([main, runAStopped, runB], []), now)
+    expect(ids(before.top)).toEqual(['sess-1', 'run-b', 'run-a'])
+    expect(ids(after.top)).toEqual(['sess-1', 'run-b'])
+    expect(ids(after.ended)).toEqual(['run-a'])
+  })
+
+  it('respects an explicit agent selection', () => {
+    const { top, ended } = splitLanes(orderAgentLanes([main, runA, endA], ['end-a']), now)
+    expect(top).toEqual([])
+    expect(ids(ended)).toEqual(['end-a'])
   })
 })

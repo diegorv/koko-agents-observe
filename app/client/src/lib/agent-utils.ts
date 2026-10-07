@@ -1,4 +1,5 @@
 import type { Agent } from '@/types'
+import { isAgentRunning, partitionByRunning } from './session-status'
 
 /**
  * Suffix the server appends to a session id to form its background lane —
@@ -52,6 +53,26 @@ export function orderAgentLanes(
   // Reverse non-main agents so newest appear right after Main
   subAgents.reverse()
   return [...mainAgents, ...(backgroundLane ? [backgroundLane] : []), ...subAgents]
+}
+
+/**
+ * Splits orderAgentLanes output into lanes shown above the "Ended" divider
+ * (Main, the background lane, running subagents) and ended subagents below.
+ * Main and the background lane stay on top even when stopped — Main flips
+ * to stopped at every turn end and would otherwise bounce between groups.
+ */
+export function splitLanes(
+  ordered: { agent: Agent; isSubagent: boolean }[],
+  now: number,
+): {
+  top: { agent: Agent; isSubagent: boolean }[]
+  ended: { agent: Agent; isSubagent: boolean }[]
+} {
+  const { running, ended } = partitionByRunning(
+    ordered,
+    ({ agent }) => !agent.parentAgentId || isBackgroundLane(agent.id) || isAgentRunning(agent, now),
+  )
+  return { top: running, ended }
 }
 
 // ── Agent colors ──────────────────────────────────────────────────────
