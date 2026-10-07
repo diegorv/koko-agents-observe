@@ -134,6 +134,15 @@ describe('stepSimulation', () => {
     expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThan(before)
   })
 
+  it('returns the peak speed, which decays toward 0 once the star settles', () => {
+    const n = node({ x: 150, y: 0 })
+    const first = stepSimulation([n], wells, () => false, bounds)
+    let last = first
+    for (let i = 0; i < 600; i++) last = stepSimulation([n], wells, () => false, bounds)
+    expect(first).toBeGreaterThan(0.1)
+    expect(last).toBeLessThan(0.01)
+  })
+
   it('does not move stars whose well is missing', () => {
     const n = node({ projectKey: 'missing', x: 30, y: 30 })
     stepSimulation([n], wells, () => false, bounds)

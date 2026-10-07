@@ -44,6 +44,33 @@ const DRILL_VIEW_H = 520 // world height when drilled into a session
 // A project touched an hour ago should still read as "big", not collapse to
 // the floor. ~4h gives a smooth falloff over the 24h window.
 const WELL_TAU_SEC = 4 * 60 * 60
+// Frame-loop budget (see the animation loop): heat/colour/running status
+// refresh at this interval instead of every frame — heat decays over tens of
+// seconds, so 10 Hz is visually identical.
+const VISUAL_INTERVAL_MS = 100
+// Physics sleeps after this many consecutive frames under SETTLE_SPEED.
+const SETTLE_SPEED = 0.02
+const SETTLE_FRAMES = 30
+
+/** What a star/ring element last drew, so unchanged frames skip DOM writes. */
+interface Drawn {
+  x: number
+  y: number
+  r: number
+  h: number
+  attn: boolean | null
+  epoch: number
+  running: boolean | null
+}
+const freshDrawn = (): Drawn => ({
+  x: NaN,
+  y: NaN,
+  r: NaN,
+  h: NaN,
+  attn: null,
+  epoch: -1,
+  running: null,
+})
 
 interface NodeMeta {
   id: string
@@ -200,6 +227,10 @@ export function ConstellationView({ onOpenSession }: DashboardThemeProps) {
   const ringRef = useRef(new Map<string, SVGCircleElement>())
   const nodesRef = useRef<NodeMeta[]>([])
   const simListRef = useRef<SimNode[]>([])
+  // Physics runs only while awake; woken by data, heat-band and attention changes.
+  const physicsAwakeRef = useRef(true)
+  // Bumped when palette/theme colours change so every star is redrawn.
+  const visualEpochRef = useRef(0)
   const orbitIdsRef = useRef(new Set<string>())
   const wellByKeyRef = useRef(new Map<string, Well>())
   const flaggedRef = useRef(flaggedSet)
@@ -297,6 +328,7 @@ export function ConstellationView({ onOpenSession }: DashboardThemeProps) {
       }
     }
     nodesRef.current = nodes
+    physicsAwakeRef.current = true
     simListRef.current = nodes.map((n) => sim.get(n.id)!).filter(Boolean)
     orbitIdsRef.current = new Set(nodes.filter((n) => n.orbitDots > 0).map((n) => n.id))
   }, [nodes, wells])
@@ -342,6 +374,7 @@ export function ConstellationView({ onOpenSession }: DashboardThemeProps) {
         warm: read('--c-warm', DEFAULT_RGB.warm),
         hot: read('--c-hot', DEFAULT_RGB.hot),
       }
+      visualEpochRef.current++
     })
     return () => cancelAnimationFrame(raf)
   }, [paletteId, theme])
@@ -368,28 +401,66 @@ export function ConstellationView({ onOpenSession }: DashboardThemeProps) {
   }, [])
 
   // ---- the animation loop ----
+  // Most frames change nothing visible: heat decays over tens of seconds and
+  // the layout settles. Rewriting every star 60x/s made Chrome repaint the
+  // whole SVG each frame (~2 CPU cores with ~100 stars). So:
+  //  - heat / colour / running status refresh every VISUAL_INTERVAL_MS;
+  //  - physics sleeps once settled, and wakes on data, heat-band or
+  //    attention changes;
+  //  - each element remembers what it last drew and skips unchanged writes.
+  // The camera still eases every frame, so pan/zoom/drill stay smooth.
   useEffect(() => {
     let raf = 0
+    let lastVisualAt = 0
+    let settledFrames = 0
     const hasOrbit = (n: SimNode) => orbitIdsRef.current.has(n.id)
+    // Keyed by DOM element so the cache dies with the element.
+    const drawn = new WeakMap<Element, Drawn>()
+    const heatBand = new Map<string, number>()
 
     const frame = () => {
       const now = Date.now()
-      const activityAt = useUIStore.getState().sessionActivityAt
-      const flagged = flaggedRef.current
-      const { cool, warm, hot } = paletteRgbRef.current
-      const tauSec = tauRef.current
       const metas = nodesRef.current
       const sim = simRef.current
+      const activityAt = useUIStore.getState().sessionActivityAt
 
-      for (const m of metas) {
-        const s = sim.get(m.id)
-        if (!s) continue
-        s.heat = heat(activityAt[m.id] ?? m.lastActivity, now, tauSec)
-        s.attention = flagged.has(m.id)
+      const visualTick = now - lastVisualAt >= VISUAL_INTERVAL_MS
+      if (visualTick) {
+        lastVisualAt = now
+        const flagged = flaggedRef.current
+        const tauSec = tauRef.current
+        for (const m of metas) {
+          const s = sim.get(m.id)
+          if (!s) continue
+          // Quantised so a star whose look hasn't visibly changed produces
+          // identical values (and its writes are skipped below).
+          s.heat = Math.round(heat(activityAt[m.id] ?? m.lastActivity, now, tauSec) * 100) / 100
+          const attention = flagged.has(m.id)
+          // Heat moves a star's target radius; wake physics only when it
+          // crosses a coarse band, not on every tiny decay step.
+          const band = Math.round(s.heat * 20)
+          if (attention !== s.attention || band !== heatBand.get(m.id)) {
+            heatBand.set(m.id, band)
+            physicsAwakeRef.current = true
+          }
+          s.attention = attention
+        }
       }
 
-      if (!focusedRef.current) {
-        stepSimulation(simListRef.current, wellByKeyRef.current, hasOrbit, paddedBoundsRef.current)
+      let stepped = false
+      if (!focusedRef.current && physicsAwakeRef.current) {
+        const peak = stepSimulation(
+          simListRef.current,
+          wellByKeyRef.current,
+          hasOrbit,
+          paddedBoundsRef.current,
+        )
+        stepped = true
+        settledFrames = peak < SETTLE_SPEED ? settledFrames + 1 : 0
+        if (settledFrames >= SETTLE_FRAMES) {
+          physicsAwakeRef.current = false
+          settledFrames = 0
+        }
       }
 
       // camera: snap to pan while dragging, else ease toward target (pan or drill box)
@@ -411,43 +482,74 @@ export function ConstellationView({ onOpenSession }: DashboardThemeProps) {
         if (moved) svgRef.current?.setAttribute('viewBox', vb.join(' '))
       }
 
-      for (const m of metas) {
-        const s = sim.get(m.id)
-        const els = elRef.current.get(m.id)
-        if (!s || !els) continue
-        const h = s.heat
-        const col = tempColor(h, cool, warm, hot)
-        const r = m.baseR * (0.82 + 0.18 * h)
-        els.g.style.transform = `translate(${s.x}px, ${s.y}px)`
-        const ring = ringRef.current.get(m.id)
-        if (ring) {
-          const running = isSessionRunning(
-            {
-              stoppedAt: m.stoppedAt,
-              lastActivity: activityAt[m.id] ?? m.lastActivity,
-              startedAt: m.startedAt,
-            },
-            now,
-          )
-          ring.style.display = running ? '' : 'none'
-          if (running) {
-            ring.style.transform = els.g.style.transform
-            ring.setAttribute('r', (r + 4).toFixed(2))
+      if (stepped || visualTick) {
+        const { cool, warm, hot } = paletteRgbRef.current
+        const epoch = visualEpochRef.current
+        for (const m of metas) {
+          const s = sim.get(m.id)
+          const els = elRef.current.get(m.id)
+          if (!s || !els) continue
+          const d = drawn.get(els.g) ?? freshDrawn()
+          drawn.set(els.g, d)
+          const x = Math.round(s.x * 10) / 10
+          const y = Math.round(s.y * 10) / 10
+          const transform = `translate(${x}px, ${y}px)`
+          if (x !== d.x || y !== d.y) {
+            els.g.style.transform = transform
+            d.x = x
+            d.y = y
+          }
+          const h = s.heat
+          const r = m.baseR * (0.82 + 0.18 * h)
+          if (h !== d.h || s.attention !== d.attn || epoch !== d.epoch || r !== d.r) {
+            const col = tempColor(h, cool, warm, hot)
+            els.g.style.opacity = s.attention ? '1' : (0.2 + 0.8 * h).toFixed(3)
+            if (els.core) {
+              els.core.setAttribute('r', r.toFixed(2))
+              els.core.setAttribute('fill', col)
+              els.core.style.filter =
+                h > 0.06 ? `drop-shadow(0 0 ${(m.baseR * 0.7 * h).toFixed(1)}px ${col})` : 'none'
+            }
+            if (els.glow) {
+              els.glow.setAttribute('fill', col)
+              els.glow.style.opacity = (0.5 * h).toFixed(3)
+            }
+            if (els.pulseWrap) els.pulseWrap.style.opacity = Math.max(0, h - 0.06).toFixed(3)
+            if (els.label) els.label.style.opacity = (0.28 + 0.55 * h).toFixed(3)
+            d.h = h
+            d.attn = s.attention
+            d.epoch = epoch
+            d.r = r
+          }
+
+          const ring = ringRef.current.get(m.id)
+          if (ring) {
+            const rd = drawn.get(ring) ?? freshDrawn()
+            drawn.set(ring, rd)
+            // Running status is minute-scale; only re-evaluate on visual ticks.
+            const running = visualTick
+              ? isSessionRunning(
+                  {
+                    stoppedAt: m.stoppedAt,
+                    lastActivity: activityAt[m.id] ?? m.lastActivity,
+                    startedAt: m.startedAt,
+                  },
+                  now,
+                )
+              : !!rd.running
+            if (running !== rd.running) {
+              ring.style.display = running ? '' : 'none'
+              rd.running = running
+            }
+            if (running && (x !== rd.x || y !== rd.y || r !== rd.r)) {
+              ring.style.transform = transform
+              ring.setAttribute('r', (r + 4).toFixed(2))
+              rd.x = x
+              rd.y = y
+              rd.r = r
+            }
           }
         }
-        els.g.style.opacity = s.attention ? '1' : (0.2 + 0.8 * h).toFixed(3)
-        if (els.core) {
-          els.core.setAttribute('r', r.toFixed(2))
-          els.core.setAttribute('fill', col)
-          els.core.style.filter =
-            h > 0.06 ? `drop-shadow(0 0 ${(m.baseR * 0.7 * h).toFixed(1)}px ${col})` : 'none'
-        }
-        if (els.glow) {
-          els.glow.setAttribute('fill', col)
-          els.glow.style.opacity = (0.5 * h).toFixed(3)
-        }
-        if (els.pulseWrap) els.pulseWrap.style.opacity = Math.max(0, h - 0.06).toFixed(3)
-        if (els.label) els.label.style.opacity = (0.28 + 0.55 * h).toFixed(3)
       }
 
       raf = requestAnimationFrame(frame)

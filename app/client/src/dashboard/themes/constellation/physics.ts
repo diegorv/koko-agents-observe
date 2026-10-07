@@ -167,7 +167,7 @@ export function stepSimulation(
   wellByKey: Map<string, Well>,
   hasOrbit: (node: SimNode) => boolean,
   bounds: Bounds,
-): void {
+): number {
   for (const s of nodes) {
     const well = wellByKey.get(s.projectKey)
     if (!well) continue
@@ -211,6 +211,7 @@ export function stepSimulation(
     }
   }
 
+  let peak = 0
   for (const s of nodes) {
     s.vx *= DAMP
     s.vy *= DAMP
@@ -220,5 +221,9 @@ export function stepSimulation(
     s.y += s.vy
     s.x = Math.max(bounds.minX, Math.min(bounds.maxX, s.x))
     s.y = Math.max(bounds.minY, Math.min(bounds.maxY, s.y))
+    peak = Math.max(peak, Math.abs(s.vx), Math.abs(s.vy))
   }
+  // Peak per-axis speed after this step — lets the caller stop stepping once
+  // the layout has settled.
+  return peak
 }

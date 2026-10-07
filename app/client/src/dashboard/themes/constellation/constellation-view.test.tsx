@@ -219,3 +219,43 @@ describe('ConstellationView running sessions', () => {
     expect(visible[0].closest('g.cst-star')).toBeNull()
   })
 })
+
+describe('ConstellationView frame loop', () => {
+  it('skips star colour writes on frames where nothing visibly changed', () => {
+    // A long-idle session: heat is ~0 and stays there, so after the first
+    // draw no frame should rewrite its colour.
+    mockWindowed = {
+      data: [session('idle', { lastActivity: Date.now() - 6 * 60 * 60 * 1000 })],
+      isLoading: false,
+    }
+    const queue: FrameRequestCallback[] = []
+    const raf = vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((cb) => {
+      queue.push(cb)
+      return queue.length
+    })
+    let t = 1_000_000
+    const now = vi.spyOn(Date, 'now').mockImplementation(() => t)
+    const step = (ms: number) => {
+      t += ms
+      const pending = queue.splice(0)
+      for (const cb of pending) cb(t)
+    }
+
+    const { container } = renderWithProviders(<ConstellationView {...props} />)
+    const core = container.querySelector('.cst-core') as SVGCircleElement
+    const fillWrites = vi.spyOn(core, 'setAttribute')
+
+    step(16) // palette read + first frame: initial draw
+    const afterFirstDraw = fillWrites.mock.calls.filter(([n]) => n === 'fill').length
+    expect(afterFirstDraw).toBeGreaterThan(0)
+
+    step(16) // within the visual interval
+    step(150) // a visual tick, but heat is unchanged
+    step(150)
+    const later = fillWrites.mock.calls.filter(([n]) => n === 'fill').length
+    expect(later).toBe(afterFirstDraw)
+
+    raf.mockRestore()
+    now.mockRestore()
+  })
+})
