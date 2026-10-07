@@ -37,3 +37,27 @@ export function partitionByRunning<T>(
   for (const item of items) (isRunning(item) ? running : ended).push(item)
   return { running, ended }
 }
+
+// Only rewrite lastActivity when it lags by more than this, so activity
+// pings don't hand React Query a new array on every single event.
+const LAST_ACTIVITY_PATCH_SLACK_MS = 60_000
+
+/**
+ * Cache patch for an activity ping: the session is alive, so clear
+ * stoppedAt and refresh lastActivity (otherwise a session past the idle
+ * cutoff would stay Ended while running). Returns `rows` unchanged when
+ * nothing needs patching.
+ */
+export function markSessionRowActive<
+  T extends { id: string; stoppedAt: number | null; lastActivity: number | null },
+>(rows: T[], sessionId: string, now: number): T[] {
+  let changed = false
+  const next = rows.map((s) => {
+    if (s.id !== sessionId) return s
+    const stale = now - (s.lastActivity ?? 0) > LAST_ACTIVITY_PATCH_SLACK_MS
+    if (s.stoppedAt == null && !stale) return s
+    changed = true
+    return { ...s, stoppedAt: null, lastActivity: stale ? now : s.lastActivity }
+  })
+  return changed ? next : rows
+}

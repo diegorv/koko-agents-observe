@@ -4,6 +4,7 @@ import {
   isSessionRunning,
   isAgentRunning,
   partitionByRunning,
+  markSessionRowActive,
 } from './session-status'
 import type { Agent } from '@/types'
 
@@ -99,5 +100,33 @@ describe('partitionByRunning', () => {
 
   it('handles empty input', () => {
     expect(partitionByRunning([], () => true)).toEqual({ running: [], ended: [] })
+  })
+})
+
+describe('markSessionRowActive', () => {
+  const rows = [
+    { id: 's1', stoppedAt: 100, lastActivity: NOW - 10 * 60_000 },
+    { id: 's2', stoppedAt: null, lastActivity: NOW - 10 * 60_000 },
+  ]
+
+  it('clears stoppedAt and bumps lastActivity for the matching row', () => {
+    const next = markSessionRowActive(rows, 's1', NOW)
+    expect(next[0]).toEqual({ id: 's1', stoppedAt: null, lastActivity: NOW })
+    expect(next[1]).toBe(rows[1])
+  })
+
+  it('revives a zombie-cut row (no stoppedAt, stale lastActivity)', () => {
+    const zombie = [{ id: 's1', stoppedAt: null, lastActivity: NOW - RUNNING_IDLE_CUTOFF_MS - 1 }]
+    const next = markSessionRowActive(zombie, 's1', NOW)
+    expect(isSessionRunning({ ...next[0], startedAt: 0 }, NOW)).toBe(true)
+  })
+
+  it('returns the same array when the row is already fresh (no re-render churn)', () => {
+    const fresh = [{ id: 's1', stoppedAt: null, lastActivity: NOW - 5_000 }]
+    expect(markSessionRowActive(fresh, 's1', NOW)).toBe(fresh)
+  })
+
+  it('returns the same array when no row matches', () => {
+    expect(markSessionRowActive(rows, 'nope', NOW)).toBe(rows)
   })
 })

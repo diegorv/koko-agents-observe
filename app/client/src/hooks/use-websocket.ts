@@ -6,43 +6,29 @@ import { pushNotification, clearNotification } from '@/components/sidebar/notifi
 import { useUIStore } from '@/stores/ui-store'
 import { useFilterStore } from '@/stores/filter-store'
 import { parseWsMessage } from './ws-parse'
+import { markSessionRowActive } from '@/lib/session-status'
 
-/** Patch the ['sessions', *] and ['recent-sessions', *] query caches so
- *  that any row matching sessionId with status='ended' flips to 'active'.
- *  Called from the activity WS handler to close the gap between a ping
- *  arriving and the next sessions refetch. */
+/** Patch the ['sessions', *], ['recent-sessions', *] and
+ *  ['unassigned-sessions', *] query caches. Called from the activity WS
+ *  handler to close the gap between a ping arriving and the next
+ *  sessions refetch. */
 /**
  * On an activity ping, clear `stoppedAt` for the session in any cached
  * sessions list — the activity is fresh evidence the session has come
- * back to life. The status field this used to bump is gone (Phase 5
- * dropped it in favor of deriving from `stoppedAt`); now we only patch
- * when the session was actually stopped, otherwise it's a no-op.
+ * back to life. Also refreshes a stale `lastActivity` so a session past
+ * the idle cutoff (lib/session-status) shows as running again.
  */
 function markSessionActiveInCache(queryClient: QueryClient, sessionId: string): void {
-  queryClient.setQueriesData<Session[]>({ queryKey: ['sessions'] }, (old) => {
-    if (!old) return old
-    let changed = false
-    const next = old.map((s) => {
-      if (s.id === sessionId && s.stoppedAt != null) {
-        changed = true
-        return { ...s, stoppedAt: null }
-      }
-      return s
-    })
-    return changed ? next : old
-  })
-  queryClient.setQueriesData<RecentSession[]>({ queryKey: ['recent-sessions'] }, (old) => {
-    if (!old) return old
-    let changed = false
-    const next = old.map((s) => {
-      if (s.id === sessionId && s.stoppedAt != null) {
-        changed = true
-        return { ...s, stoppedAt: null }
-      }
-      return s
-    })
-    return changed ? next : old
-  })
+  const now = Date.now()
+  queryClient.setQueriesData<Session[]>({ queryKey: ['sessions'] }, (old) =>
+    old ? markSessionRowActive(old, sessionId, now) : old,
+  )
+  queryClient.setQueriesData<RecentSession[]>({ queryKey: ['recent-sessions'] }, (old) =>
+    old ? markSessionRowActive(old, sessionId, now) : old,
+  )
+  queryClient.setQueriesData<RecentSession[]>({ queryKey: ['unassigned-sessions'] }, (old) =>
+    old ? markSessionRowActive(old, sessionId, now) : old,
+  )
 }
 
 const WS_URL = `ws://${window.location.host}/api/events/stream`
