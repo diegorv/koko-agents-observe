@@ -5,7 +5,7 @@ import type { Agent } from '@/types'
  * without a stop signal. Covers crashed/killed processes (and agent classes
  * like Codex) that never emit SessionEnd / SubagentStop.
  */
-export const RUNNING_IDLE_CUTOFF_MS = 60 * 60 * 1000
+export const RUNNING_IDLE_CUTOFF_MS = 45 * 60 * 1000
 
 interface SessionLike {
   stoppedAt: number | null
