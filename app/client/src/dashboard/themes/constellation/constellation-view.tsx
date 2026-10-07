@@ -593,12 +593,33 @@ export function ConstellationView({ onOpenSession }: DashboardThemeProps) {
     })
   }
 
+  const controls = (
+    <ConstellationControls
+      collapsed={collapsed}
+      onToggleCollapsed={onToggleCollapsed}
+      paletteId={paletteId}
+      onPalette={selectPalette}
+      windowMs={windowMs}
+      onWindow={onWindowChange}
+      viewH={viewH}
+      onZoom={setViewH}
+      reduced={reduced}
+      onReduced={setReduced}
+      tau={tau}
+      onTau={setTau}
+      onRecenter={recenter}
+    />
+  )
+
+  // Keep the controls on the empty state too — otherwise a short window
+  // with no activity leaves no way to widen it.
   if (!isLoading && sessions.length === 0) {
     return (
       <div className="constellation flex items-center justify-center" data-palette={paletteId}>
         <div className="text-sm" style={{ color: 'var(--c-muted)' }}>
-          No sessions active in the last 24 hours.
+          No sessions active in the last {fmtDuration(windowMs)}.
         </div>
+        {controls}
       </div>
     )
   }
@@ -752,21 +773,7 @@ export function ConstellationView({ onOpenSession }: DashboardThemeProps) {
       )}
 
       {!focusedId && <RunningPanel sessions={sessions} onFocus={focus} />}
-      <ConstellationControls
-        collapsed={collapsed}
-        onToggleCollapsed={onToggleCollapsed}
-        paletteId={paletteId}
-        onPalette={selectPalette}
-        windowMs={windowMs}
-        onWindow={onWindowChange}
-        viewH={viewH}
-        onZoom={setViewH}
-        reduced={reduced}
-        onReduced={setReduced}
-        tau={tau}
-        onTau={setTau}
-        onRecenter={recenter}
-      />
+      {controls}
 
       <div className="cst-tooltip" ref={tooltipRef} />
     </div>
@@ -829,7 +836,7 @@ function ConstellationControls({
             ))}
           </div>
           <div className="cst-slider">
-            <label htmlFor="cst-window">window</label>
+            <label htmlFor="cst-window">last</label>
             <input
               id="cst-window"
               type="range"

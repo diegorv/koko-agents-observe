@@ -66,7 +66,10 @@ describe('ConstellationView', () => {
   it('shows an empty state when there are no sessions in the window', () => {
     mockWindowed = { data: [], isLoading: false }
     renderWithProviders(<ConstellationView {...props} />)
-    expect(screen.getByText(/No sessions active in the last 24 hours/i)).toBeTruthy()
+    // Default window is 45m; the controls stay so it can be widened.
+    expect(screen.getByText(/No sessions active in the last 45m/i)).toBeTruthy()
+    expect(screen.getByText('last')).toBeTruthy()
+    expect(screen.getByText('45m')).toBeTruthy()
   })
 
   it('runs its animation frame without error', () => {
@@ -89,7 +92,7 @@ describe('ConstellationView', () => {
     mockWindowed = { data: [session('a')], isLoading: false }
     renderWithProviders(<ConstellationView {...props} />)
     // sliders present
-    expect(screen.getByText('window')).toBeTruthy()
+    expect(screen.getByText('last')).toBeTruthy()
     expect(screen.getByText('zoom')).toBeTruthy()
     expect(screen.getByText('decay τ')).toBeTruthy()
     expect(screen.getByText('Deep Space')).toBeTruthy() // palette visible while expanded

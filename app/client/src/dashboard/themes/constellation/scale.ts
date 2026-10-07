@@ -6,7 +6,7 @@
 
 export const WINDOW_MIN_MS = 30 * 60 * 1000 // 30 minutes
 export const WINDOW_MAX_MS = 90 * 24 * 60 * 60 * 1000 // 90 days
-export const DEFAULT_WINDOW_MS = 24 * 60 * 60 * 1000 // 24 hours
+export const DEFAULT_WINDOW_MS = 45 * 60 * 1000 // 45 minutes, same as the running cutoff
 
 // Camera "zoom" expressed as the world-height shown in the viewport. Smaller =
 // zoomed in (bigger bubbles); larger = zoomed out (more of the canvas).
