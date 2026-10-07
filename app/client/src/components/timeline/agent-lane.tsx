@@ -202,6 +202,8 @@ interface AgentLaneProps {
   events: EnrichedEvent[]
   allEvents: EnrichedEvent[]
   isSubagent: boolean
+  /** Below the timeline's "Ended" divider: name shown muted. */
+  ended?: boolean
   color: string
 }
 
@@ -211,6 +213,7 @@ export function AgentLane({
   events,
   allEvents,
   isSubagent,
+  ended = false,
   color,
 }: AgentLaneProps) {
   const agentId = agent.id
@@ -292,7 +295,9 @@ export function AgentLane({
       <button
         className={cn(
           'absolute left-0 top-0 bottom-0 w-40 text-2xs truncate px-2 text-left cursor-pointer hover:underline flex items-center gap-1',
-          color,
+          // Ended lanes swap the agent color for a muted one instead of
+          // lowering opacity further — keeps the compositor rules above.
+          ended ? 'text-muted-foreground' : color,
           isSubagent ? 'opacity-80 dark:opacity-50' : 'opacity-100 dark:opacity-70',
         )}
         onClick={handleAgentNameClick}

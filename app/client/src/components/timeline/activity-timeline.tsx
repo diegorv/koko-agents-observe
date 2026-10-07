@@ -39,13 +39,21 @@ import { useEffectiveEvents } from '@/hooks/use-effective-events'
 import { useAgents } from '@/hooks/use-agents'
 import { useProcessedEvents } from '@/agents/event-processing-context'
 import { useSessions } from '@/hooks/use-sessions'
-import { buildAgentColorMap, getAgentColorById, orderAgentLanes } from '@/lib/agent-utils'
+import {
+  buildAgentColorMap,
+  getAgentColorById,
+  orderAgentLanes,
+  splitLanes,
+} from '@/lib/agent-utils'
+import { useNow } from '@/hooks/use-now'
+import { StatusSectionHeader } from '@/components/shared/status-section-header'
 import { AgentLane } from './agent-lane'
 import { TimelineRewind } from './timeline-rewind'
 import { Button } from '@/components/ui/button'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { Rewind, Play } from 'lucide-react'
 import type { EnrichedEvent } from '@/agents/types'
+import type { Agent } from '@/types'
 
 export function ActivityTimeline() {
   const {
@@ -109,6 +117,14 @@ export function ActivityTimeline() {
     () => orderAgentLanes(agents, selectedAgentIds),
     [agents, selectedAgentIds],
   )
+  const now = useNow()
+  // Main, background and running lanes above an "Ended" divider. The
+  // divider is a sibling between lanes (never inside one) and carries no
+  // opacity/filter — see the compositor notes in agent-lane.tsx.
+  const { top: topLanes, ended: endedLanes } = useMemo(
+    () => splitLanes(flatAgents, now),
+    [flatAgents, now],
+  )
 
   const agentColorMap = useMemo(() => buildAgentColorMap(agents), [agents])
 
@@ -122,6 +138,40 @@ export function ActivityTimeline() {
     }
     return map
   }, [enrichedEvents])
+
+  // One flat keyed list (lanes + divider) so a lane crossing the divider
+  // is moved, not remounted — nested arrays would key by position and
+  // restart every DotContainer animation below the change.
+  const renderLane = (
+    { agent, isSubagent }: { agent: Agent; isSubagent: boolean },
+    ended: boolean,
+  ) => (
+    <AgentLane
+      key={agent.id}
+      agent={agent}
+      parentAgent={agent.parentAgentId ? agents.find((a) => a.id === agent.parentAgentId) : null}
+      events={eventsByAgent.get(agent.id) || []}
+      allEvents={enrichedEvents}
+      isSubagent={isSubagent}
+      ended={ended}
+      color={getAgentColorById(agent.id, agentColorMap).textOnly}
+    />
+  )
+  const laneNodes = [
+    ...topLanes.map((l) => renderLane(l, false)),
+    ...(topLanes.length > 0 && endedLanes.length > 0
+      ? [
+          <StatusSectionHeader
+            key="ended-divider"
+            id="timeline-ended-divider"
+            status="ended"
+            count={endedLanes.length}
+            className="h-4 px-2 border-b border-border/30"
+          />,
+        ]
+      : []),
+    ...endedLanes.map((l) => renderLane(l, true)),
+  ]
 
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -288,19 +338,7 @@ export function ActivityTimeline() {
             />
           ) : (
             <>
-              {flatAgents.map(({ agent, isSubagent }) => (
-                <AgentLane
-                  key={agent.id}
-                  agent={agent}
-                  parentAgent={
-                    agent.parentAgentId ? agents.find((a) => a.id === agent.parentAgentId) : null
-                  }
-                  events={eventsByAgent.get(agent.id) || []}
-                  allEvents={enrichedEvents}
-                  isSubagent={isSubagent}
-                  color={getAgentColorById(agent.id, agentColorMap).textOnly}
-                />
-              ))}
+              {laneNodes}
               {flatAgents.length === 0 && (
                 <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
                   No agent activity
