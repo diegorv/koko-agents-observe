@@ -1,7 +1,9 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo } from 'react'
 import { useEvents } from '@/hooks/use-events'
 import { useAgents } from '@/hooks/use-agents'
 import { useUIStore } from '@/stores/ui-store'
+import { useNow } from '@/hooks/use-now'
+import { isAgentRunning, partitionByRunning } from '@/lib/session-status'
 import { getAgentDisplayName, buildAgentColorMap, getAgentColorById } from '@/lib/agent-utils'
 import { AgentLabel } from '@/components/shared/agent-label'
 import { AgentClassIcon, agentClassDisplayName } from '@/components/shared/agent-class-icon'
@@ -43,35 +45,105 @@ export function AgentCombobox() {
   const { data: events } = useEvents(selectedSessionId)
   const agents = useAgents(selectedSessionId, events)
   const [open, setOpen] = useState(false)
-  const snapshotRef = useRef<Agent[]>([])
+  const now = useNow()
 
-  // Snapshot the sorted order when the popover opens so it doesn't
-  // re-sort while the user is browsing
-  const sortedAgents = useMemo(() => {
-    if (!open) return snapshotRef.current
-
+  // Main stays pinned on top (it flips to stopped at every turn end);
+  // subagents split live into Running now / Ended, newest first.
+  const { main, running, ended } = useMemo(() => {
     const main = agents.filter((a) => !a.parentAgentId)
     const subs = agents
       .filter((a) => a.parentAgentId)
-      .sort((a, b) => {
-        // Active first
-        if (a.status === 'active' && b.status !== 'active') return -1
-        if (a.status !== 'active' && b.status === 'active') return 1
-        // Most recently started first
-        return (b.firstEventAt ?? 0) - (a.firstEventAt ?? 0)
-      })
-
-    const sorted = [...main, ...subs]
-    snapshotRef.current = sorted
-    return sorted
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, agents])
+      .sort((a, b) => (b.firstEventAt ?? 0) - (a.firstEventAt ?? 0))
+    return { main, ...partitionByRunning(subs, (a) => isAgentRunning(a, now)) }
+  }, [agents, now])
 
   const agentColorMap = useMemo(() => buildAgentColorMap(agents), [agents])
   const agentMap = useMemo(() => new Map(agents.map((a) => [a.id, a])), [agents])
 
-  const activeCount = agents.filter((a) => a.status === 'active').length
+  // Counts Main too while it is processing a turn.
+  const activeCount = agents.filter((a) => isAgentRunning(a, now)).length
   const selectedAgents = agents.filter((a) => selectedAgentIds.includes(a.id))
+
+  const renderRow = (agent: Agent) => {
+    const isSelected = selectedAgentIds.includes(agent.id)
+    const isRunning = isAgentRunning(agent, now)
+    const isMain = !agent.parentAgentId
+    const agentColor = getAgentColorById(agent.id, agentColorMap)
+
+    return (
+      <CommandItem
+        key={agent.id}
+        value={agent.id}
+        onSelect={() => toggleAgentId(agent.id)}
+        className="text-xs gap-2 items-start"
+      >
+        <div
+          className={cn(
+            'flex items-center justify-center h-4 w-4 rounded border shrink-0 mt-0.5',
+            isSelected
+              ? 'bg-primary border-primary text-primary-foreground'
+              : 'border-muted-foreground/30',
+          )}
+        >
+          {isSelected && <Check className="h-3 w-3" />}
+        </div>
+        <span
+          className={cn(
+            'h-2 w-2 shrink-0 rounded-full mt-1.5',
+            isRunning ? 'bg-green-500' : 'bg-muted-foreground/40',
+          )}
+        />
+        <div className={cn('flex flex-col min-w-0 flex-1', !isRunning && 'opacity-60')}>
+          <div className="flex items-center gap-1 min-w-0">
+            <AgentClassIcon agentClass={agent.agentClass} className="text-muted-foreground/70" />
+            <AgentLabel
+              agent={agent}
+              disableTooltip
+              className={cn('truncate', isMain && 'font-medium', agentColor.textOnly)}
+            />
+          </div>
+          {(() => {
+            const showDesc =
+              !isMain && agent.description && agent.description !== getAgentDisplayName(agent)
+            const showType = !isMain && !!agent.agentType
+            const showCwd = !isMain && !!agent.cwd
+            const className = agentClassDisplayName(agent.agentClass)
+            return (
+              <div className="flex items-center gap-0 text-2xs text-muted-foreground/50 min-w-0">
+                <span className="shrink-0">{className}</span>
+                {(showDesc || showType) && <span className="shrink-0 mx-1">-</span>}
+                {showDesc && <span className="truncate">{agent.description}</span>}
+                {showDesc && showType && <span className="shrink-0 mx-1">-</span>}
+                {showType && <span className="font-mono shrink-0">{agent.agentType}</span>}
+                {showCwd && (
+                  <span className="ml-auto truncate pl-2" dir="rtl">
+                    <span dir="ltr">{agent.cwd!.replace(/^\/(?:Users|home)\/[^/]+/, '~')}</span>
+                  </span>
+                )}
+              </div>
+            )
+          })()}
+        </div>
+        <div className="flex items-center gap-2 shrink-0 text-2xs text-muted-foreground">
+          <span>{formatStartTime(agent.firstEventAt ?? 0)}</span>
+          <span>{formatRuntime(agent)}</span>
+          <Badge variant="outline" className="text-2xs h-3.5 px-1">
+            {agent.eventCount}
+          </Badge>
+          <button
+            className="opacity-40 hover:opacity-100 transition-opacity"
+            title="Copy agent ID"
+            onClick={(e) => {
+              e.stopPropagation()
+              navigator.clipboard.writeText(agent.id)
+            }}
+          >
+            <Copy className="h-3 w-3" />
+          </button>
+        </div>
+      </CommandItem>
+    )
+  }
 
   return (
     <div className="flex items-center gap-1.5 flex-wrap min-w-0">
@@ -100,7 +172,7 @@ export function AgentCombobox() {
           <Command
             filter={(value, search) => {
               // Custom filter: match against agent display name and description
-              const agent = sortedAgents.find((a) => a.id === value)
+              const agent = agentMap.get(value)
               if (!agent) return 0
               const name = getAgentDisplayName(agent).toLowerCase()
               const desc = (agent.name || '').toLowerCase()
@@ -124,96 +196,17 @@ export function AgentCombobox() {
                 </CommandItem>
               </CommandGroup>
               <CommandSeparator />
-              <CommandGroup heading={`${agents.length} agents`}>
-                {sortedAgents.map((agent) => {
-                  const isSelected = selectedAgentIds.includes(agent.id)
-                  const isMain = !agent.parentAgentId
-                  const agentColor = getAgentColorById(agent.id, agentColorMap)
-
-                  return (
-                    <CommandItem
-                      key={agent.id}
-                      value={agent.id}
-                      onSelect={() => toggleAgentId(agent.id)}
-                      className="text-xs gap-2 items-start"
-                    >
-                      <div
-                        className={cn(
-                          'flex items-center justify-center h-4 w-4 rounded border shrink-0 mt-0.5',
-                          isSelected
-                            ? 'bg-primary border-primary text-primary-foreground'
-                            : 'border-muted-foreground/30',
-                        )}
-                      >
-                        {isSelected && <Check className="h-3 w-3" />}
-                      </div>
-                      <span
-                        className={cn(
-                          'h-2 w-2 shrink-0 rounded-full mt-1.5',
-                          agent.status === 'active' ? 'bg-green-500' : 'bg-muted-foreground/40',
-                        )}
-                      />
-                      <div className="flex flex-col min-w-0 flex-1">
-                        <div className="flex items-center gap-1 min-w-0">
-                          <AgentClassIcon
-                            agentClass={agent.agentClass}
-                            className="text-muted-foreground/70"
-                          />
-                          <AgentLabel
-                            agent={agent}
-                            disableTooltip
-                            className={cn('truncate', isMain && 'font-medium', agentColor.textOnly)}
-                          />
-                        </div>
-                        {(() => {
-                          const showDesc =
-                            !isMain &&
-                            agent.description &&
-                            agent.description !== getAgentDisplayName(agent)
-                          const showType = !isMain && !!agent.agentType
-                          const showCwd = !isMain && !!agent.cwd
-                          const className = agentClassDisplayName(agent.agentClass)
-                          return (
-                            <div className="flex items-center gap-0 text-2xs text-muted-foreground/50 min-w-0">
-                              <span className="shrink-0">{className}</span>
-                              {(showDesc || showType) && <span className="shrink-0 mx-1">-</span>}
-                              {showDesc && <span className="truncate">{agent.description}</span>}
-                              {showDesc && showType && <span className="shrink-0 mx-1">-</span>}
-                              {showType && (
-                                <span className="font-mono shrink-0">{agent.agentType}</span>
-                              )}
-                              {showCwd && (
-                                <span className="ml-auto truncate pl-2" dir="rtl">
-                                  <span dir="ltr">
-                                    {agent.cwd!.replace(/^\/(?:Users|home)\/[^/]+/, '~')}
-                                  </span>
-                                </span>
-                              )}
-                            </div>
-                          )
-                        })()}
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0 text-2xs text-muted-foreground">
-                        <span>{formatStartTime(agent.firstEventAt ?? 0)}</span>
-                        <span>{formatRuntime(agent)}</span>
-                        <Badge variant="outline" className="text-2xs h-3.5 px-1">
-                          {agent.eventCount}
-                        </Badge>
-                        <button
-                          className="opacity-40 hover:opacity-100 transition-opacity"
-                          title="Copy agent ID"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            navigator.clipboard.writeText(agent.id)
-                          }}
-                        >
-                          <Copy className="h-3 w-3" />
-                        </button>
-                      </div>
-                    </CommandItem>
-                  )
-                })}
-              </CommandGroup>
+              {main.length > 0 && <CommandGroup>{main.map(renderRow)}</CommandGroup>}
+              {running.length > 0 && (
+                <CommandGroup heading={`Running now (${running.length})`}>
+                  {running.map(renderRow)}
+                </CommandGroup>
+              )}
+              {ended.length > 0 && (
+                <CommandGroup heading={`Ended (${ended.length})`}>
+                  {ended.map(renderRow)}
+                </CommandGroup>
+              )}
             </CommandList>
           </Command>
         </PopoverContent>
@@ -232,7 +225,7 @@ export function AgentCombobox() {
             <span
               className={cn(
                 'h-1.5 w-1.5 rounded-full',
-                agent.status === 'active' ? 'bg-green-500' : 'bg-muted-foreground/40',
+                isAgentRunning(agent, now) ? 'bg-green-500' : 'bg-muted-foreground/40',
               )}
             />
             <AgentLabel
