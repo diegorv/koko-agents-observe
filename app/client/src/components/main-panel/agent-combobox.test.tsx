@@ -53,7 +53,7 @@ describe('AgentCombobox running/ended groups', () => {
       makeAgent('end-a', { status: 'stopped' }),
     ])
     renderWithProviders(<AgentCombobox />)
-    expect(screen.getByText('2 active')).toBeInTheDocument()
+    expect(screen.getByText('2 running')).toBeInTheDocument()
   })
 
   it('splits subagents into Running now and Ended, with Main pinned on top', () => {

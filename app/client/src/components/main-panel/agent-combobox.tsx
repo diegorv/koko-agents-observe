@@ -158,7 +158,7 @@ export function AgentCombobox() {
             <Users className="h-3.5 w-3.5" />
             Agents
             {activeCount > 0 && (
-              <span className="text-green-600 dark:text-green-400">{activeCount} active</span>
+              <span className="text-green-600 dark:text-green-400">{activeCount} running</span>
             )}
             {selectedAgentIds.length > 0 && (
               <Badge variant="secondary" className="text-2xs h-4 px-1 ml-0.5">
