@@ -155,6 +155,14 @@
 .cst-star {
   cursor: pointer;
 }
+/* fixed ring on running sessions, in its own layer so the star's
+   heat-driven opacity never fades it (see constellation-view frame loop) */
+.cst-active-ring {
+  fill: none;
+  stroke: var(--c-active-ring);
+  stroke-width: 2;
+  pointer-events: none;
+}
 .cst-core {
   stroke: rgb(var(--c-stroke) / 0.55);
   stroke-width: 0.75;
@@ -228,6 +236,9 @@
 }
 .cst-star--focused .cst-label {
   opacity: 0;
+}
+.constellation--focused .cst-field .cst-rings {
+  opacity: 0.06;
 }
 
 /* drill-in tree */
@@ -386,6 +397,50 @@
   font-size: 10px;
   color: var(--c-muted);
   margin-top: 8px;
+}
+
+/* "Running now" list, top-left (controls sit top-right) */
+.cst-running {
+  top: 12px;
+  left: 12px;
+  width: 220px;
+}
+.cst-running .cst-panel-h {
+  padding-right: 0;
+  color: var(--c-active-ring);
+}
+.cst-running-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.cst-running-row {
+  font: inherit;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  width: 100%;
+  padding: 3px 4px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--c-fg);
+  text-align: left;
+  cursor: pointer;
+}
+.cst-running-row:hover {
+  background: var(--c-btn-hover);
+}
+.cst-running-slug {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cst-running-proj {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 10px;
+  color: var(--c-muted);
 }
 
 .cst-tooltip {

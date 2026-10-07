@@ -1,8 +1,9 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
-import { cleanup, screen, fireEvent } from '@testing-library/react'
+import { cleanup, screen, fireEvent, within } from '@testing-library/react'
 import { renderWithProviders } from '@/test/test-utils'
 import { useUIStore } from '@/stores/ui-store'
 import { ConstellationView } from './constellation-view'
+import { RUNNING_IDLE_CUTOFF_MS } from '@/lib/session-status'
 import type { RecentSession } from '@/types'
 
 // The constellation fetches its own activity-windowed sessions; mock that hook.
@@ -32,6 +33,12 @@ function session(id: string, over: Partial<RecentSession> = {}): RecentSession {
 
 const props = { sessions: [], isLoading: false, onOpenSession: () => {} }
 
+// The Running now panel repeats slugs/project names, so star queries are
+// scoped to the SVG.
+// within() is typed for HTMLElement but works on any Element.
+const inSvg = (container: HTMLElement) =>
+  within(container.querySelector('svg') as unknown as HTMLElement)
+
 afterEach(() => {
   cleanup()
   useUIStore.getState().clearPreviewSession()
@@ -47,11 +54,12 @@ describe('ConstellationView', () => {
       ],
       isLoading: false,
     }
-    renderWithProviders(<ConstellationView {...props} />)
-    expect(screen.getByText('swift-otter')).toBeTruthy()
-    expect(screen.getByText('calm-harbor')).toBeTruthy()
-    expect(screen.getByText('alpha')).toBeTruthy() // well label
-    expect(screen.getByText('beta')).toBeTruthy()
+    const { container } = renderWithProviders(<ConstellationView {...props} />)
+    const svg = inSvg(container)
+    expect(svg.getByText('swift-otter')).toBeTruthy()
+    expect(svg.getByText('calm-harbor')).toBeTruthy()
+    expect(svg.getByText('alpha')).toBeTruthy() // well label
+    expect(svg.getByText('beta')).toBeTruthy()
     expect(screen.getByText('Deep Space')).toBeTruthy() // palette control
   })
 
@@ -99,7 +107,7 @@ describe('ConstellationView', () => {
     mockWindowed = { data: [session('evil', { projectName: payload })], isLoading: false }
     const { container } = renderWithProviders(<ConstellationView {...props} />)
 
-    fireEvent.mouseMove(screen.getByText('evil').closest('g.cst-star')!)
+    fireEvent.mouseMove(inSvg(container).getByText('evil').closest('g.cst-star')!)
 
     const tooltip = container.querySelector('.cst-tooltip')!
     expect(tooltip.querySelector('img')).toBeNull()
@@ -123,12 +131,88 @@ describe('ConstellationView', () => {
     const { container } = renderWithProviders(<ConstellationView {...props} />)
     expect(useUIStore.getState().previewSessionId).toBeNull()
 
-    const star = screen.getByText('swift-otter').closest('g.cst-star')!
+    const star = inSvg(container).getByText('swift-otter').closest('g.cst-star')!
     fireEvent.click(star)
     expect(useUIStore.getState().previewSessionId).toBe('swift-otter')
     expect(useUIStore.getState().previewProjectId).toBe(7)
 
     fireEvent.click(container.querySelector('svg')!)
     expect(useUIStore.getState().previewSessionId).toBeNull()
+  })
+})
+
+describe('ConstellationView running sessions', () => {
+  it('lists running sessions in the Running now panel, not ended ones', () => {
+    mockWindowed = {
+      data: [
+        session('live-one'),
+        session('done-one', { stoppedAt: Date.now() - 1000 }),
+        session('zombie', { lastActivity: Date.now() - RUNNING_IDLE_CUTOFF_MS - 1 }),
+      ],
+      isLoading: false,
+    }
+    renderWithProviders(<ConstellationView {...props} />)
+    const panel = screen.getByRole('group', { name: 'Running now (1)' })
+    expect(within(panel).getByText('live-one')).toBeTruthy()
+    expect(within(panel).queryByText('done-one')).toBeNull()
+    expect(within(panel).queryByText('zombie')).toBeNull()
+  })
+
+  it('hides the panel when nothing is running', () => {
+    mockWindowed = { data: [session('done', { stoppedAt: Date.now() - 1000 })], isLoading: false }
+    renderWithProviders(<ConstellationView {...props} />)
+    expect(screen.queryByRole('group', { name: /Running now/ })).toBeNull()
+  })
+
+  it('caps the list and shows the overflow count', () => {
+    mockWindowed = {
+      data: Array.from({ length: 10 }, (_, i) => session(`s${i}`)),
+      isLoading: false,
+    }
+    renderWithProviders(<ConstellationView {...props} />)
+    const panel = screen.getByRole('group', { name: 'Running now (10)' })
+    expect(within(panel).getAllByRole('button')).toHaveLength(8)
+    expect(within(panel).getByText('+2 more')).toBeTruthy()
+  })
+
+  it('focuses the star when a panel row is clicked, and hides the panel while focused', () => {
+    mockWindowed = { data: [session('swift-otter', { projectId: 7 })], isLoading: false }
+    renderWithProviders(<ConstellationView {...props} />)
+    const panel = screen.getByRole('group', { name: 'Running now (1)' })
+    fireEvent.click(within(panel).getByText('swift-otter'))
+    expect(useUIStore.getState().previewSessionId).toBe('swift-otter')
+    expect(screen.queryByRole('group', { name: /Running now/ })).toBeNull()
+  })
+
+  it('renders a panel slug as text, never as HTML', () => {
+    const slug = '<img src=x onerror="alert(1)">'
+    mockWindowed = { data: [session('evil', { slug })], isLoading: false }
+    const { container } = renderWithProviders(<ConstellationView {...props} />)
+    expect(container.querySelector('.cst-running img')).toBeNull()
+    expect(container.querySelector('.cst-running-slug')!.textContent).toBe(slug)
+  })
+
+  it('shows the ring for running sessions only, independent of star opacity', () => {
+    mockWindowed = {
+      data: [session('live-one'), session('done-one', { stoppedAt: Date.now() - 1000 })],
+      isLoading: false,
+    }
+    // Run the first few rAF callbacks (palette read + one render frame);
+    // the cap stops the frame loop from rescheduling forever.
+    let calls = 0
+    const raf = vi
+      .spyOn(globalThis, 'requestAnimationFrame')
+      .mockImplementation((cb: FrameRequestCallback) => {
+        if (calls++ < 3) cb(0)
+        return 0
+      })
+    const { container } = renderWithProviders(<ConstellationView {...props} />)
+    raf.mockRestore()
+    const rings = [...container.querySelectorAll<SVGCircleElement>('.cst-rings .cst-active-ring')]
+    expect(rings).toHaveLength(2)
+    const visible = rings.filter((r) => r.style.display !== 'none')
+    expect(visible).toHaveLength(1)
+    // Rings sit outside every star <g>, so star opacity can't fade them.
+    expect(visible[0].closest('g.cst-star')).toBeNull()
   })
 })

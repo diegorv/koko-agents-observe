@@ -15,6 +15,8 @@ import {
 } from './physics'
 import { PALETTES, parseColor, resolvePaletteId, tempColor, type RGB } from './palettes'
 import { DrillIn } from './drill-in'
+import { RunningPanel } from './running-panel'
+import { isSessionRunning } from '@/lib/session-status'
 import {
   DEFAULT_WINDOW_MS,
   DEFAULT_VIEW_H,
@@ -51,6 +53,8 @@ interface NodeMeta {
   baseR: number
   orbitDots: number
   lastActivity: number
+  startedAt: number
+  stoppedAt: number | null
 }
 
 interface NodeEls {
@@ -146,6 +150,8 @@ export function ConstellationView({ onOpenSession }: DashboardThemeProps) {
         baseR: radius(s.eventCount),
         orbitDots: Math.min(Math.max((s.agentCount ?? 1) - 1, 0), 6),
         lastActivity: s.lastActivity,
+        startedAt: s.startedAt,
+        stoppedAt: s.stoppedAt,
       })),
     [sessions],
   )
@@ -191,6 +197,7 @@ export function ConstellationView({ onOpenSession }: DashboardThemeProps) {
   // ---- imperative state shared with the animation loop (no re-render) ----
   const simRef = useRef(new Map<string, SimNode>())
   const elRef = useRef(new Map<string, NodeEls>())
+  const ringRef = useRef(new Map<string, SVGCircleElement>())
   const nodesRef = useRef<NodeMeta[]>([])
   const simListRef = useRef<SimNode[]>([])
   const orbitIdsRef = useRef(new Set<string>())
@@ -339,6 +346,13 @@ export function ConstellationView({ onOpenSession }: DashboardThemeProps) {
     return () => cancelAnimationFrame(raf)
   }, [paletteId, theme])
 
+  // Running rings live in their own layer (not inside the star <g>) so the
+  // star's heat-driven opacity doesn't fade them out.
+  const registerRing = useCallback((id: string, c: SVGCircleElement | null) => {
+    if (c) ringRef.current.set(id, c)
+    else ringRef.current.delete(id)
+  }, [])
+
   const registerNode = useCallback((id: string, g: SVGGElement | null) => {
     if (!g) {
       elRef.current.delete(id)
@@ -405,6 +419,22 @@ export function ConstellationView({ onOpenSession }: DashboardThemeProps) {
         const col = tempColor(h, cool, warm, hot)
         const r = m.baseR * (0.82 + 0.18 * h)
         els.g.style.transform = `translate(${s.x}px, ${s.y}px)`
+        const ring = ringRef.current.get(m.id)
+        if (ring) {
+          const running = isSessionRunning(
+            {
+              stoppedAt: m.stoppedAt,
+              lastActivity: activityAt[m.id] ?? m.lastActivity,
+              startedAt: m.startedAt,
+            },
+            now,
+          )
+          ring.style.display = running ? '' : 'none'
+          if (running) {
+            ring.style.transform = els.g.style.transform
+            ring.setAttribute('r', (r + 4).toFixed(2))
+          }
+        }
         els.g.style.opacity = s.attention ? '1' : (0.2 + 0.8 * h).toFixed(3)
         if (els.core) {
           els.core.setAttribute('r', r.toFixed(2))
@@ -615,6 +645,19 @@ export function ConstellationView({ onOpenSession }: DashboardThemeProps) {
               </g>
             )
           })}
+          <g className="cst-rings">
+            {nodes.map((m) => (
+              <circle
+                key={m.id}
+                ref={(c) => registerRing(m.id, c)}
+                className="cst-active-ring"
+                cx={0}
+                cy={0}
+                r={m.baseR + 4}
+                style={{ display: 'none' }}
+              />
+            ))}
+          </g>
           {nodes.map((m) => {
             const orbitR = m.baseR + 16
             const flagged = flaggedSet.has(m.id)
@@ -708,6 +751,7 @@ export function ConstellationView({ onOpenSession }: DashboardThemeProps) {
         />
       )}
 
+      {!focusedId && <RunningPanel sessions={sessions} onFocus={focus} />}
       <ConstellationControls
         collapsed={collapsed}
         onToggleCollapsed={onToggleCollapsed}
