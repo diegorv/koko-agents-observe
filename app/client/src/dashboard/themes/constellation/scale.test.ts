@@ -11,6 +11,7 @@ import {
   zoomPercent,
   fmtDuration,
   DEFAULT_VIEW_H,
+  ZOOM_REF_VIEW_H,
 } from './scale'
 
 describe('window slider scale', () => {
@@ -44,8 +45,9 @@ describe('zoom slider scale', () => {
       expect(zoomPosToViewH(viewHToZoomPos(vh))).toBeCloseTo(vh, 0)
     }
   })
-  it('reports 100% at the default view height and higher when zoomed in', () => {
-    expect(zoomPercent(DEFAULT_VIEW_H)).toBe(100)
+  it('reports 100% at the reference height, 120% by default, higher when zoomed in', () => {
+    expect(zoomPercent(ZOOM_REF_VIEW_H)).toBe(100)
+    expect(zoomPercent(DEFAULT_VIEW_H)).toBe(120)
     expect(zoomPercent(ZOOM_MIN_VIEW)).toBeGreaterThan(100)
     expect(zoomPercent(ZOOM_MAX_VIEW)).toBeLessThan(100)
   })

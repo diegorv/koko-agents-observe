@@ -12,7 +12,10 @@ export const DEFAULT_WINDOW_MS = 45 * 60 * 1000 // 45 minutes, same as the runni
 // zoomed in (bigger bubbles); larger = zoomed out (more of the canvas).
 export const ZOOM_MIN_VIEW = 380 // most zoomed in
 export const ZOOM_MAX_VIEW = 3200 // most zoomed out
-export const DEFAULT_VIEW_H = 1000
+// The view height that reads as 100% on the zoom slider.
+export const ZOOM_REF_VIEW_H = 1000
+// Default zoom: 120%.
+export const DEFAULT_VIEW_H = ZOOM_REF_VIEW_H / 1.2
 
 const clamp01 = (t: number) => (t < 0 ? 0 : t > 1 ? 1 : t)
 
@@ -38,9 +41,9 @@ export function viewHToZoomPos(vh: number): number {
   return clamp01(Math.log(ZOOM_MAX_VIEW / clamped) / Math.log(ZOOM_MAX_VIEW / ZOOM_MIN_VIEW))
 }
 
-/** Zoom as a percentage where the default view height reads 100%. */
+/** Zoom as a percentage where ZOOM_REF_VIEW_H reads 100%. */
 export function zoomPercent(vh: number): number {
-  return Math.round((DEFAULT_VIEW_H / vh) * 100)
+  return Math.round((ZOOM_REF_VIEW_H / vh) * 100)
 }
 
 /** Human-readable duration label for the window slider (e.g. "30m", "24h", "90d"). */
