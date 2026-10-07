@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from 'react'
+import { useMemo, useState, useCallback, useId } from 'react'
 import { useProjects } from '@/hooks/use-projects'
 import { useSessions } from '@/hooks/use-sessions'
 import { useUnassignedSessions } from '@/hooks/use-unassigned-sessions'
@@ -13,6 +13,9 @@ import { cn } from '@/lib/utils'
 import { ProjectModal } from '@/components/settings/project-modal'
 import { SessionItem } from './session-item'
 import { useProjectPulseActive } from '@/hooks/use-pulse-active'
+import { useNow } from '@/hooks/use-now'
+import { isSessionRunning, partitionByRunning } from '@/lib/session-status'
+import { StatusSectionHeader } from '@/components/shared/status-section-header'
 import {
   NotificationIndicator,
   dismissNotifications,
@@ -89,13 +92,17 @@ interface SessionGroup {
   sessions: Session[]
 }
 
-function groupSessionsByDate(sessions: Session[], sortBy: 'activity' | 'created'): SessionGroup[] {
-  // Sort sessions by the chosen field (descending — most recent first)
-  const sorted = [...sessions].sort((a, b) => {
+// Sort sessions by the chosen field (descending — most recent first)
+function sortSessions(sessions: Session[], sortBy: 'activity' | 'created'): Session[] {
+  return [...sessions].sort((a, b) => {
     const aTime = sortBy === 'activity' ? a.lastActivity || a.startedAt : a.startedAt
     const bTime = sortBy === 'activity' ? b.lastActivity || b.startedAt : b.startedAt
     return bTime - aTime
   })
+}
+
+function groupSessionsByDate(sessions: Session[], sortBy: 'activity' | 'created'): SessionGroup[] {
+  const sorted = sortSessions(sessions, sortBy)
 
   // Group by date label based on the same field used for sorting
   const groups: SessionGroup[] = []
@@ -259,6 +266,11 @@ function UnassignedBucket({ sessions, collapsed }: { sessions: Session[]; collap
   const [expanded, setExpanded] = useState(true)
   const { selectedSessionId, setSelectedSessionId, setEditingSessionId } = useUIStore()
   const previewSessionId = useUIStore((s) => s.previewSessionId)
+  const now = useNow()
+  const sectionId = useId()
+  // Running first; headers only when both kinds are present.
+  const { running, ended } = partitionByRunning(sessions, (s) => isSessionRunning(s, now))
+  const mixed = running.length > 0 && ended.length > 0
 
   if (collapsed) {
     return (
@@ -279,6 +291,25 @@ function UnassignedBucket({ sessions, collapsed }: { sessions: Session[]; collap
   }
 
   const toggle = () => setExpanded((v) => !v)
+
+  const renderSession = (session: Session) => (
+    <SessionItem
+      key={session.id}
+      session={session}
+      isSelected={selectedSessionId === session.id}
+      isPreview={selectedSessionId !== session.id && previewSessionId === session.id}
+      isPinned={false}
+      onSelect={() => setSelectedSessionId(session.id)}
+      onTogglePin={() => {}}
+      // Inline rename isn't useful for unassigned sessions —
+      // the SessionEditModal is where the user moves them into
+      // a project. Always route the pencil to the modal.
+      onRename={async () => {}}
+      onEdit={() => setEditingSessionId(session.id)}
+      showCwd={false}
+      cwd={typeof session.metadata?.cwd === 'string' ? session.metadata.cwd : null}
+    />
+  )
 
   return (
     <div data-testid="unassigned-bucket">
@@ -309,24 +340,30 @@ function UnassignedBucket({ sessions, collapsed }: { sessions: Session[]; collap
       </div>
       {expanded && (
         <div className="ml-3.5 mt-1 pb-3 border-l border-border">
-          {sessions.map((session) => (
-            <SessionItem
-              key={session.id}
-              session={session}
-              isSelected={selectedSessionId === session.id}
-              isPreview={selectedSessionId !== session.id && previewSessionId === session.id}
-              isPinned={false}
-              onSelect={() => setSelectedSessionId(session.id)}
-              onTogglePin={() => {}}
-              // Inline rename isn't useful for unassigned sessions —
-              // the SessionEditModal is where the user moves them into
-              // a project. Always route the pencil to the modal.
-              onRename={async () => {}}
-              onEdit={() => setEditingSessionId(session.id)}
-              showCwd={false}
-              cwd={typeof session.metadata?.cwd === 'string' ? session.metadata.cwd : null}
-            />
-          ))}
+          {mixed ? (
+            <>
+              <div role="group" aria-labelledby={`${sectionId}-running`} className="mb-2">
+                <StatusSectionHeader
+                  id={`${sectionId}-running`}
+                  status="running"
+                  count={running.length}
+                  className="px-2 pb-0.5"
+                />
+                {running.map(renderSession)}
+              </div>
+              <div role="group" aria-labelledby={`${sectionId}-ended`}>
+                <StatusSectionHeader
+                  id={`${sectionId}-ended`}
+                  status="ended"
+                  count={ended.length}
+                  className="px-2 pb-0.5"
+                />
+                {ended.map(renderSession)}
+              </div>
+            </>
+          ) : (
+            sessions.map(renderSession)
+          )}
         </div>
       )}
     </div>
@@ -440,13 +477,24 @@ function SessionList({ projectId }: { projectId: number }) {
     [projectId, queryClient],
   )
 
+  const now = useNow()
+  const sectionId = useId()
+  const { running, ended } = useMemo(
+    () => partitionByRunning(sessions ?? [], (s) => isSessionRunning(s, now)),
+    [sessions, now],
+  )
+  const sortedRunning = useMemo(
+    () => sortSessions(running, sessionSortOrder),
+    [running, sessionSortOrder],
+  )
+  // Date groups hold only ended sessions; running ones get their own
+  // section on top that is never collapsed.
   const groups = useMemo(() => {
-    if (!sessions?.length) return []
-    return groupSessionsByDate(sessions, sessionSortOrder)
-  }, [sessions, sessionSortOrder])
+    if (!ended.length) return []
+    return groupSessionsByDate(ended, sessionSortOrder)
+  }, [ended, sessionSortOrder])
 
-  const totalSessions = sessions?.length ?? 0
-  const shouldCollapse = totalSessions > 10
+  const shouldCollapse = ended.length > 10
   const GROUP_PREVIEW_COUNT = 5
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
 
@@ -463,110 +511,140 @@ function SessionList({ projectId }: { projectId: number }) {
     return <div className="text-xs text-muted-foreground pl-6 py-1">No sessions</div>
   }
 
+  // Rendered once, in whichever header comes first (Running, else the
+  // first date group).
+  const sortToggle = (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          className="flex items-center gap-1 ml-auto text-2xs normal-case tracking-normal text-muted-foreground hover:text-foreground cursor-pointer"
+          onClick={() =>
+            setSessionSortOrder(sessionSortOrder === 'activity' ? 'created' : 'activity')
+          }
+        >
+          {sessionSortOrder === 'activity' ? (
+            <>
+              <Clock className="h-3 w-3" /> Recent
+            </>
+          ) : (
+            <>
+              <CalendarDays className="h-3 w-3" /> Created
+            </>
+          )}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="right" className="text-xs">
+        {sessionSortOrder === 'activity' ? 'Sorted by recent activity' : 'Sorted by creation date'}
+      </TooltipContent>
+    </Tooltip>
+  )
+
+  const renderSession = (session: Session) => {
+    const isSelected = selectedSessionId === session.id
+    const isPreview = !isSelected && previewSessionId === session.id
+    // Active session: live count from streaming events.
+    // Other sessions: server-provided count (refreshes when
+    // sessions list refetches). Falls through to undefined
+    // for sessions whose payload predates the eventCount
+    // field.
+    const liveEventCount =
+      session.id === selectedSessionId && currentEvents ? currentEvents.length : session.eventCount
+
+    return (
+      <SessionItem
+        key={session.id}
+        session={session}
+        isSelected={isSelected}
+        isPreview={isPreview}
+        isPinned={pinnedSessionIds.has(session.id)}
+        onSelect={() => setSelectedSessionId(session.id)}
+        onTogglePin={() => togglePinnedSession(session.id)}
+        onRename={handleRename}
+        onEdit={() => setEditingSessionId(session.id)}
+        eventCountOverride={liveEventCount}
+        relativeTime={formatRelativeTime(
+          sessionSortOrder === 'activity'
+            ? session.lastActivity || session.startedAt
+            : session.startedAt,
+        )}
+        cwd={typeof session.metadata?.cwd === 'string' ? session.metadata.cwd : null}
+        showCwd={false}
+      />
+    )
+  }
+
+  const hasRunning = sortedRunning.length > 0
+
   return (
     <div className="ml-3.5 mt-1 pb-3 border-l border-border">
-      {groups.map((group, groupIndex) => {
-        const isGroupExpanded = !shouldCollapse || expandedGroups.has(group.label)
-        const previewCount = group.label === 'Today' ? 10 : GROUP_PREVIEW_COUNT
-        const visibleSessions = isGroupExpanded
-          ? group.sessions
-          : group.sessions.slice(0, previewCount)
-        const hiddenCount = group.sessions.length - visibleSessions.length
+      {hasRunning && (
+        <div role="group" aria-labelledby={`${sectionId}-running`} className="mb-3">
+          <StatusSectionHeader
+            id={`${sectionId}-running`}
+            status="running"
+            count={sortedRunning.length}
+            className="px-2 pb-0.5"
+          >
+            {sortToggle}
+          </StatusSectionHeader>
+          {sortedRunning.map(renderSession)}
+        </div>
+      )}
+      {groups.length > 0 && (
+        <div
+          role={hasRunning ? 'group' : undefined}
+          aria-labelledby={hasRunning ? `${sectionId}-ended` : undefined}
+        >
+          {hasRunning && (
+            <StatusSectionHeader
+              id={`${sectionId}-ended`}
+              status="ended"
+              count={ended.length}
+              className="px-2 pb-1"
+            />
+          )}
+          {groups.map((group, groupIndex) => {
+            const isGroupExpanded = !shouldCollapse || expandedGroups.has(group.label)
+            const previewCount = group.label === 'Today' ? 10 : GROUP_PREVIEW_COUNT
+            const visibleSessions = isGroupExpanded
+              ? group.sessions
+              : group.sessions.slice(0, previewCount)
+            const hiddenCount = group.sessions.length - visibleSessions.length
 
-        return (
-          <div key={group.label} className={groupIndex > 0 ? 'mt-3' : ''}>
-            <div className="flex items-center px-2 pt-0 pb-0.5 select-none">
-              <span className="text-2xs uppercase tracking-wider text-muted-foreground/50 dark:text-muted-foreground/30">
-                {group.label}
-              </span>
-              {groupIndex === 0 && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
+            return (
+              <div key={group.label} className={groupIndex > 0 ? 'mt-3' : ''}>
+                <div className="flex items-center px-2 pt-0 pb-0.5 select-none">
+                  <span className="text-2xs uppercase tracking-wider text-muted-foreground/50 dark:text-muted-foreground/30">
+                    {group.label}
+                  </span>
+                  {groupIndex === 0 && !hasRunning && sortToggle}
+                </div>
+                {visibleSessions.map(renderSession)}
+                {hiddenCount > 0 && (
+                  <button
+                    data-sidebar-item=""
+                    className="w-full text-2xs text-muted-foreground hover:text-foreground px-2 py-1 cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-ring rounded"
+                    onClick={() => toggleGroup(group.label)}
+                  >
+                    Show {hiddenCount} more...
+                  </button>
+                )}
+                {shouldCollapse &&
+                  expandedGroups.has(group.label) &&
+                  group.sessions.length > previewCount && (
                     <button
-                      className="flex items-center gap-1 ml-auto text-2xs text-muted-foreground hover:text-foreground cursor-pointer"
-                      onClick={() =>
-                        setSessionSortOrder(
-                          sessionSortOrder === 'activity' ? 'created' : 'activity',
-                        )
-                      }
+                      data-sidebar-item=""
+                      className="w-full text-2xs text-muted-foreground hover:text-foreground px-2 py-1 cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-ring rounded"
+                      onClick={() => toggleGroup(group.label)}
                     >
-                      {sessionSortOrder === 'activity' ? (
-                        <>
-                          <Clock className="h-3 w-3" /> Recent
-                        </>
-                      ) : (
-                        <>
-                          <CalendarDays className="h-3 w-3" /> Created
-                        </>
-                      )}
+                      Show less
                     </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="right" className="text-xs">
-                    {sessionSortOrder === 'activity'
-                      ? 'Sorted by recent activity'
-                      : 'Sorted by creation date'}
-                  </TooltipContent>
-                </Tooltip>
-              )}
-            </div>
-            {visibleSessions.map((session) => {
-              const isSelected = selectedSessionId === session.id
-              const isPreview = !isSelected && previewSessionId === session.id
-              // Active session: live count from streaming events.
-              // Other sessions: server-provided count (refreshes when
-              // sessions list refetches). Falls through to undefined
-              // for sessions whose payload predates the eventCount
-              // field.
-              const liveEventCount =
-                session.id === selectedSessionId && currentEvents
-                  ? currentEvents.length
-                  : session.eventCount
-
-              return (
-                <SessionItem
-                  key={session.id}
-                  session={session}
-                  isSelected={isSelected}
-                  isPreview={isPreview}
-                  isPinned={pinnedSessionIds.has(session.id)}
-                  onSelect={() => setSelectedSessionId(session.id)}
-                  onTogglePin={() => togglePinnedSession(session.id)}
-                  onRename={handleRename}
-                  onEdit={() => setEditingSessionId(session.id)}
-                  eventCountOverride={liveEventCount}
-                  relativeTime={formatRelativeTime(
-                    sessionSortOrder === 'activity'
-                      ? session.lastActivity || session.startedAt
-                      : session.startedAt,
                   )}
-                  cwd={typeof session.metadata?.cwd === 'string' ? session.metadata.cwd : null}
-                  showCwd={false}
-                />
-              )
-            })}
-            {hiddenCount > 0 && (
-              <button
-                data-sidebar-item=""
-                className="w-full text-2xs text-muted-foreground hover:text-foreground px-2 py-1 cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-ring rounded"
-                onClick={() => toggleGroup(group.label)}
-              >
-                Show {hiddenCount} more...
-              </button>
-            )}
-            {shouldCollapse &&
-              expandedGroups.has(group.label) &&
-              group.sessions.length > previewCount && (
-                <button
-                  data-sidebar-item=""
-                  className="w-full text-2xs text-muted-foreground hover:text-foreground px-2 py-1 cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-ring rounded"
-                  onClick={() => toggleGroup(group.label)}
-                >
-                  Show less
-                </button>
-              )}
-          </div>
-        )
-      })}
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

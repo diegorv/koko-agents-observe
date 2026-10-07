@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { screen, fireEvent, waitFor } from '@testing-library/react'
+import { screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { renderWithProviders } from '@/test/test-utils'
 import { ProjectList } from './project-list'
 import { useUIStore } from '@/stores/ui-store'
@@ -221,5 +221,87 @@ describe('ProjectList - Unassigned bucket', () => {
     const editIcon = screen.getByTestId('edit-session-sess-orphan-1')
     fireEvent.click(editIcon)
     expect(useUIStore.getState().editingSessionId).toBe('sess-orphan-1')
+  })
+})
+
+describe('ProjectList - Running/Ended sections', () => {
+  const running = (id: string) => makeSession({ id, slug: id, lastActivity: Date.now() })
+  const ended = (id: string) =>
+    makeSession({ id, slug: id, status: 'ended', stoppedAt: Date.now() - 1000 })
+
+  it('renders running sessions in a Running now group above the Ended group', () => {
+    setMockSessions([ended('e1'), running('r1'), running('r2')])
+    renderWithProviders(<ProjectList collapsed={false} />)
+    const runningGroup = screen.getByRole('group', { name: 'Running now (2)' })
+    const endedGroup = screen.getByRole('group', { name: 'Ended (1)' })
+    expect(within(runningGroup).getByText('r1')).toBeInTheDocument()
+    expect(within(runningGroup).getByText('r2')).toBeInTheDocument()
+    expect(within(runningGroup).queryByText('e1')).not.toBeInTheDocument()
+    expect(within(endedGroup).getByText('e1')).toBeInTheDocument()
+    expect(
+      runningGroup.compareDocumentPosition(endedGroup) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  })
+
+  it('renders no status headers when nothing is running', () => {
+    setMockSessions([ended('e1'), ended('e2')])
+    renderWithProviders(<ProjectList collapsed={false} />)
+    expect(screen.queryByText(/Running now/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/^Ended \(/)).not.toBeInTheDocument()
+    expect(screen.getByText('e1')).toBeInTheDocument()
+  })
+
+  it('shows the sort toggle exactly once, in the first header', () => {
+    setMockSessions([ended('e1'), running('r1')])
+    const { unmount } = renderWithProviders(<ProjectList collapsed={false} />)
+    const runningGroup = screen.getByRole('group', { name: 'Running now (1)' })
+    expect(screen.getAllByText('Recent')).toHaveLength(1)
+    expect(within(runningGroup).getByText('Recent')).toBeInTheDocument()
+    unmount()
+
+    setMockSessions([ended('e1')])
+    renderWithProviders(<ProjectList collapsed={false} />)
+    expect(screen.getAllByText('Recent')).toHaveLength(1)
+  })
+
+  it('never collapses running sessions and counts only ended ones for collapse', () => {
+    // 8 running + 5 ended = 13 total, but only 5 ended → no "Show more".
+    setMockSessions([
+      ...Array.from({ length: 8 }, (_, i) => running(`r${i}`)),
+      ...Array.from({ length: 5 }, (_, i) => ended(`e${i}`)),
+    ])
+    renderWithProviders(<ProjectList collapsed={false} />)
+    expect(screen.queryByText(/Show \d+ more/)).not.toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Running now (8)' })).toBeInTheDocument()
+  })
+
+  it('keeps sidebar items in DOM order running first for keyboard nav', () => {
+    setMockSessions([ended('e1'), running('r1')])
+    renderWithProviders(<ProjectList collapsed={false} />)
+    const items = Array.from(document.querySelectorAll('[data-sidebar-item]'))
+      .map((el) => el.textContent ?? '')
+      .filter((t) => /^(r1|e1)/.test(t))
+    expect(items[0]).toMatch(/^r1/)
+    expect(items[1]).toMatch(/^e1/)
+  })
+
+  it('splits a mixed Unassigned bucket with headers', () => {
+    setMockProjects([])
+    setMockUnassignedSessions([
+      { ...ended('u-e1'), projectId: null },
+      { ...running('u-r1'), projectId: null },
+    ])
+    renderWithProviders(<ProjectList collapsed={false} />)
+    const bucket = screen.getByTestId('unassigned-bucket')
+    const runningGroup = within(bucket).getByRole('group', { name: 'Running now (1)' })
+    expect(within(runningGroup).getByText('u-r1')).toBeInTheDocument()
+    expect(within(bucket).getByRole('group', { name: 'Ended (1)' })).toBeInTheDocument()
+  })
+
+  it('keeps a single-kind Unassigned bucket flat', () => {
+    setMockProjects([])
+    setMockUnassignedSessions([{ ...running('u-r1'), projectId: null }])
+    renderWithProviders(<ProjectList collapsed={false} />)
+    expect(screen.queryByRole('group')).not.toBeInTheDocument()
   })
 })
