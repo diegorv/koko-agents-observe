@@ -3,7 +3,8 @@ import { useEvents } from '@/hooks/use-events'
 import { useAgents } from '@/hooks/use-agents'
 import { useUIStore } from '@/stores/ui-store'
 import { useNow } from '@/hooks/use-now'
-import { isAgentRunning, partitionByRunning } from '@/lib/session-status'
+import { isAgentRunning, isSessionRunning, partitionByRunning } from '@/lib/session-status'
+import { useSessions } from '@/hooks/use-sessions'
 import { getAgentDisplayName, buildAgentColorMap, getAgentColorById } from '@/lib/agent-utils'
 import { AgentLabel } from '@/components/shared/agent-label'
 import { AgentClassIcon, agentClassDisplayName } from '@/components/shared/agent-class-icon'
@@ -41,11 +42,21 @@ function formatStartTime(ts: number): string {
 }
 
 export function AgentCombobox() {
-  const { selectedSessionId, selectedAgentIds, toggleAgentId, setSelectedAgentIds } = useUIStore()
+  const {
+    selectedProjectId,
+    selectedSessionId,
+    selectedAgentIds,
+    toggleAgentId,
+    setSelectedAgentIds,
+  } = useUIStore()
+  // Same per-project cache the timeline reads; no extra fetch.
+  const { data: sessions } = useSessions(selectedProjectId)
   const { data: events } = useEvents(selectedSessionId)
   const agents = useAgents(selectedSessionId, events)
   const [open, setOpen] = useState(false)
   const now = useNow()
+  const session = sessions?.find((s) => s.id === selectedSessionId)
+  const sessionEnded = !!session && !isSessionRunning(session, now)
 
   // Main stays pinned on top (it flips to stopped at every turn end);
   // subagents split live into Running now / Ended, newest first.
@@ -54,19 +65,19 @@ export function AgentCombobox() {
     const subs = agents
       .filter((a) => a.parentAgentId)
       .sort((a, b) => (b.firstEventAt ?? 0) - (a.firstEventAt ?? 0))
-    return { main, ...partitionByRunning(subs, (a) => isAgentRunning(a, now)) }
-  }, [agents, now])
+    return { main, ...partitionByRunning(subs, (a) => isAgentRunning(a, now, sessionEnded)) }
+  }, [agents, now, sessionEnded])
 
   const agentColorMap = useMemo(() => buildAgentColorMap(agents), [agents])
   const agentMap = useMemo(() => new Map(agents.map((a) => [a.id, a])), [agents])
 
   // Counts Main too while it is processing a turn.
-  const activeCount = agents.filter((a) => isAgentRunning(a, now)).length
+  const activeCount = agents.filter((a) => isAgentRunning(a, now, sessionEnded)).length
   const selectedAgents = agents.filter((a) => selectedAgentIds.includes(a.id))
 
   const renderRow = (agent: Agent) => {
     const isSelected = selectedAgentIds.includes(agent.id)
-    const isRunning = isAgentRunning(agent, now)
+    const isRunning = isAgentRunning(agent, now, sessionEnded)
     const isMain = !agent.parentAgentId
     const agentColor = getAgentColorById(agent.id, agentColorMap)
 
@@ -225,7 +236,9 @@ export function AgentCombobox() {
             <span
               className={cn(
                 'h-1.5 w-1.5 rounded-full',
-                isAgentRunning(agent, now) ? 'bg-green-500' : 'bg-muted-foreground/40',
+                isAgentRunning(agent, now, sessionEnded)
+                  ? 'bg-green-500'
+                  : 'bg-muted-foreground/40',
               )}
             />
             <AgentLabel

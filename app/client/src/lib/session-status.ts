@@ -22,8 +22,13 @@ export function isSessionRunning(session: SessionLike, now: number): boolean {
   return now - (session.lastActivity || session.startedAt) < RUNNING_IDLE_CUTOFF_MS
 }
 
-export function isAgentRunning(agent: Agent, now: number): boolean {
-  if (agent.status !== 'active') return false
+/**
+ * `sessionEnded` covers subagents that never got their own stop event
+ * (common: a large ended session can have dozens of them) — once the
+ * session is over, none of its agents can still be running.
+ */
+export function isAgentRunning(agent: Agent, now: number, sessionEnded = false): boolean {
+  if (sessionEnded || agent.status !== 'active') return false
   return now - (agent.lastEventAt ?? 0) < RUNNING_IDLE_CUTOFF_MS
 }
 

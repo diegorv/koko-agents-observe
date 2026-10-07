@@ -7,7 +7,13 @@ import type { Agent } from '@/types'
 
 // Reassigned (not mutated) per update, like the real useAgents result.
 let mockAgents: Agent[] = []
-vi.mock('@/hooks/use-sessions', () => ({ useSessions: () => ({ data: [] }) }))
+let mockSessions: {
+  id: string
+  stoppedAt: number | null
+  startedAt: number
+  lastActivity: number
+}[] = []
+vi.mock('@/hooks/use-sessions', () => ({ useSessions: () => ({ data: mockSessions }) }))
 vi.mock('@/hooks/use-effective-events', () => ({ useEffectiveEvents: () => ({ data: [] }) }))
 vi.mock('@/hooks/use-agents', () => ({ useAgents: () => mockAgents }))
 vi.mock('@/agents/event-processing-context', () => ({
@@ -41,6 +47,19 @@ function laneButton(name: string) {
 describe('ActivityTimeline running/ended lanes', () => {
   beforeEach(() => {
     useUIStore.setState({ selectedSessionId: 'sess-1', selectedAgentIds: [], rewindMode: false })
+    mockSessions = []
+  })
+
+  it('puts every subagent below the divider once the session has ended', () => {
+    mockSessions = [
+      { id: 'sess-1', stoppedAt: Date.now() - 1000, startedAt: 0, lastActivity: Date.now() },
+    ]
+    setAgents([makeAgent('sess-1', { parentAgentId: null }), makeAgent('run-a')])
+    renderWithProviders(<ActivityTimeline />)
+    const divider = screen.getByText('Ended (1)')
+    expect(
+      divider.compareDocumentPosition(laneButton('run-a')) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
   })
 
   it('places an Ended divider between running and ended lanes', () => {

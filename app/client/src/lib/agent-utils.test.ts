@@ -260,6 +260,12 @@ describe('splitLanes', () => {
     expect(ids(after.ended)).toEqual(['run-a'])
   })
 
+  it('moves every subagent below the divider once the session has ended', () => {
+    const { top, ended } = splitLanes(orderAgentLanes([main, lane, runA, endA], []), now, true)
+    expect(ids(top)).toEqual(['sess-1', 'sess-1:background'])
+    expect(ids(ended)).toEqual(['end-a', 'run-a'])
+  })
+
   it('respects an explicit agent selection', () => {
     const { top, ended } = splitLanes(orderAgentLanes([main, runA, endA], ['end-a']), now)
     expect(top).toEqual([])

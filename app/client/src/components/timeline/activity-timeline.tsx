@@ -46,6 +46,7 @@ import {
   splitLanes,
 } from '@/lib/agent-utils'
 import { useNow } from '@/hooks/use-now'
+import { isSessionRunning } from '@/lib/session-status'
 import { StatusSectionHeader } from '@/components/shared/status-section-header'
 import { AgentLane } from './agent-lane'
 import { TimelineRewind } from './timeline-rewind'
@@ -121,9 +122,11 @@ export function ActivityTimeline() {
   // Main, background and running lanes above an "Ended" divider. The
   // divider is a sibling between lanes (never inside one) and carries no
   // opacity/filter — see the compositor notes in agent-lane.tsx.
+  const effectiveSession = sessions?.find((s) => s.id === effectiveSessionId)
+  const sessionEnded = !!effectiveSession && !isSessionRunning(effectiveSession, now)
   const { top: topLanes, ended: endedLanes } = useMemo(
-    () => splitLanes(flatAgents, now),
-    [flatAgents, now],
+    () => splitLanes(flatAgents, now, sessionEnded),
+    [flatAgents, now, sessionEnded],
   )
 
   const agentColorMap = useMemo(() => buildAgentColorMap(agents), [agents])

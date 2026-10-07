@@ -13,6 +13,13 @@ Element.prototype.scrollIntoView = vi.fn()
 const mockAgents: Agent[] = []
 vi.mock('@/hooks/use-events', () => ({ useEvents: () => ({ data: [] }) }))
 vi.mock('@/hooks/use-agents', () => ({ useAgents: () => mockAgents }))
+let mockSessions: {
+  id: string
+  stoppedAt: number | null
+  startedAt: number
+  lastActivity: number
+}[] = []
+vi.mock('@/hooks/use-sessions', () => ({ useSessions: () => ({ data: mockSessions }) }))
 
 function makeAgent(id: string, overrides: Partial<Agent> = {}): Agent {
   return {
@@ -44,6 +51,20 @@ const groupOf = (heading: string) =>
 describe('AgentCombobox running/ended groups', () => {
   beforeEach(() => {
     useUIStore.setState({ selectedSessionId: 'sess-1', selectedAgentIds: [] })
+    mockSessions = []
+  })
+
+  it('treats every subagent as ended once the session has ended', () => {
+    mockSessions = [
+      { id: 'sess-1', stoppedAt: Date.now() - 1000, startedAt: 0, lastActivity: Date.now() },
+    ]
+    // run-a never got its own stop event — common in large sessions.
+    setAgents([makeAgent('sess-1', { parentAgentId: null }), makeAgent('run-a')])
+    renderWithProviders(<AgentCombobox />)
+    expect(screen.queryByText(/running$/)).not.toBeInTheDocument()
+    openPopover()
+    expect(within(groupOf('Ended (1)')).getByText('run-a')).toBeInTheDocument()
+    expect(screen.queryByText(/^Running now/)).not.toBeInTheDocument()
   })
 
   it('counts running agents including Main in the trigger', () => {

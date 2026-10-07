@@ -64,13 +64,17 @@ export function orderAgentLanes(
 export function splitLanes(
   ordered: { agent: Agent; isSubagent: boolean }[],
   now: number,
+  sessionEnded = false,
 ): {
   top: { agent: Agent; isSubagent: boolean }[]
   ended: { agent: Agent; isSubagent: boolean }[]
 } {
   const { running, ended } = partitionByRunning(
     ordered,
-    ({ agent }) => !agent.parentAgentId || isBackgroundLane(agent.id) || isAgentRunning(agent, now),
+    ({ agent }) =>
+      !agent.parentAgentId ||
+      isBackgroundLane(agent.id) ||
+      isAgentRunning(agent, now, sessionEnded),
   )
   return { top: running, ended }
 }

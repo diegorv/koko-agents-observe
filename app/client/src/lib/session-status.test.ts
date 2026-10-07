@@ -77,6 +77,10 @@ describe('isAgentRunning', () => {
     expect(isAgentRunning(agent({ status: 'stopped' }), NOW)).toBe(false)
   })
 
+  it('is ended once its session has ended, even without its own stop event', () => {
+    expect(isAgentRunning(agent({}), NOW, true)).toBe(false)
+  })
+
   it('treats an active agent silent past the cutoff as ended', () => {
     expect(isAgentRunning(agent({ lastEventAt: NOW - RUNNING_IDLE_CUTOFF_MS }), NOW)).toBe(false)
   })
