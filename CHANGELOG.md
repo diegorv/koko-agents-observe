@@ -1,5 +1,30 @@
 # Changelog
 
+## v1.6.0 — Running now vs. Ended across the dashboard
+
+This release separates live sessions from finished ones throughout the dashboard. The home list, sidebar, agent picker and timeline now show **Running now** and **Ended** groups, and a session counts as idle after 45 minutes without activity. The constellation view has a new Running now panel and rings around live sessions, and it uses much less CPU because cold stars no longer animate or repaint on every frame.
+
+### Features
+
+- The home session list and the sidebar are split into Running now and Ended sections
+- The agent picker groups agents into Running now and Ended, and its count reads "N running" instead of "N active"
+- In the timeline, lanes for subagents that have ended move below an Ended divider
+- Session status dots use Running/Ended labels and are based on the idle cutoff
+- Sessions with no activity for 45 minutes are treated as ended
+- In the constellation, running sessions get a ring and a new Running now panel lists them
+- The constellation now defaults to a "last 45m" time window and 120% zoom
+
+### Fixes
+
+- A stopped session becomes active again when a later event arrives
+- Activity pings now refresh a session's last-activity time, so sessions that went idle come back as running
+- When a session ends, all of its subagents are now marked as ended too
+
+### Other
+
+- Faster constellation rendering: stars are no longer repainted on every frame, and cold stars no longer run pulse and orbit animations
+- Upgraded lucide-react to v1, with an inline GitHub icon in its place
+
 ## v1.5.0 — Dependency upgrades across server, client, and tooling
 
 This is a maintenance release that brings the server, client, and test tooling up to their latest major versions. The SQLite driver now uses its bundled prebuilt binaries, so installs should be faster and more reliable. Dashboard features and behavior are unchanged.
