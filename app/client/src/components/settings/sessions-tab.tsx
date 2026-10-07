@@ -599,7 +599,7 @@ function SessionRow({
             'h-2 w-2 shrink-0 rounded-full ' +
             (isActive ? 'bg-green-500' : 'bg-muted-foreground/60 dark:bg-muted-foreground/40')
           }
-          title={isActive ? 'Active' : 'Stopped'}
+          title={isActive ? 'Running' : 'Ended'}
         />
         <span className="truncate font-medium">{label}</span>
       </div>

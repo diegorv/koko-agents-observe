@@ -11,6 +11,8 @@ import {
   useAnnounceVisibleBell,
 } from './notification-indicator'
 import { useSessionPulseActive } from '@/hooks/use-pulse-active'
+import { useNow } from '@/hooks/use-now'
+import { isSessionRunning } from '@/lib/session-status'
 import type { Session } from '@/types'
 
 interface SessionItemProps {
@@ -102,12 +104,11 @@ export function SessionItem({
     setEditValue('')
   }, [editValue, label, session.id, onRename])
 
-  // Status is derived from stoppedAt — the server emits a `status`
-  // string for back-compat but `stoppedAt` is the canonical signal and
-  // also the only one persisted on the row. Reading directly avoids a
-  // round-trip through a stringly-typed field.
-  const isActive = !session.stoppedAt
-  const statusLabel = isActive ? 'Active' : 'Ended'
+  // Same rule as the Running now / Ended sections (stoppedAt + idle
+  // cutoff) so the dot never disagrees with the section it sits in.
+  const now = useNow()
+  const isActive = isSessionRunning(session, now)
+  const statusLabel = isActive ? 'Running' : 'Ended'
   // `eventCountOverride` is supplied by the parent — live count for
   // the active session (from streaming events) or the server-provided
   // count for the rest. Undefined for sessions whose payload predates

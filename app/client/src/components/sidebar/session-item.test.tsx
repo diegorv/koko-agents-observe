@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/test-utils'
 import { SessionItem } from './session-item'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { RUNNING_IDLE_CUTOFF_MS } from '@/lib/session-status'
 import type { Session } from '@/types'
 
 function makeSession(overrides: Partial<Session> = {}): Session {
@@ -89,6 +90,17 @@ describe('SessionItem status indicator', () => {
     const dot = container.querySelector('span.rounded-full') as HTMLElement
     expect(dot.className).not.toContain('bg-green-500')
     expect(dot.className).toContain('bg-muted-foreground')
+  })
+})
+
+describe('SessionItem idle cutoff', () => {
+  it('paints the dot muted for a session idle past the cutoff (zombie)', () => {
+    renderItem(
+      makeSession({ stoppedAt: null, lastActivity: Date.now() - RUNNING_IDLE_CUTOFF_MS - 1 }),
+    )
+    const container = screen.getAllByText('my-session')[0].closest('[role="button"]') as HTMLElement
+    const dot = container.querySelector('span.rounded-full') as HTMLElement
+    expect(dot.className).not.toContain('bg-green-500')
   })
 })
 

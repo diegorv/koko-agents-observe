@@ -287,7 +287,7 @@ export function SessionEditModal() {
                     : 'bg-muted-foreground/60 dark:bg-muted-foreground/40'
                 }`}
               />
-              <span>{session.status === 'active' ? 'Active' : 'Ended'}</span>
+              <span>{session.status === 'active' ? 'Running' : 'Ended'}</span>
               {session.projectName && (
                 <>
                   <span>·</span>
