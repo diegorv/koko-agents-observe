@@ -206,6 +206,16 @@ router.post('/events', async (c) => {
     if (flags.stopsSession) {
       await store.stopSession(envelope.sessionId, timestamp)
     }
+    // Any later event means the session was resumed. Clear stopped_at here
+    // (and broadcast below) so every client sees it running again — the
+    // lazy fix in GET /sessions/:id/events only runs when the session is
+    // opened and never broadcasts, which made rows flip back to ended on
+    // the next refetch.
+    const reactivated =
+      !flags.stopsSession && session?.stopped_at != null && timestamp > session.stopped_at
+    if (reactivated) {
+      await store.updateSessionStatus(envelope.sessionId, 'active')
+    }
 
     // ---- Step 7: compose response (callbacks) ----------------------------
     // Refresh session row so we see post-upsert slug + the freshly
@@ -251,6 +261,12 @@ router.post('/events', async (c) => {
       broadcastToAll({
         type: 'session_update',
         data: { id: envelope.sessionId, status: 'stopped' },
+      })
+    }
+    if (reactivated) {
+      broadcastToAll({
+        type: 'session_update',
+        data: { id: envelope.sessionId, status: 'active' },
       })
     }
     if (pendingTransition === 'set') {

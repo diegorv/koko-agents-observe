@@ -246,6 +246,72 @@ describe('POST /api/events — flags', () => {
     ).toBeTruthy()
   })
 
+  test('event after stopped_at reactivates the session and broadcasts session_update', async () => {
+    await seedSession('sess-1')
+    await postEvent({
+      agentClass: 'claude-code',
+      sessionId: 'sess-1',
+      agentId: 'sess-1',
+      hookName: 'SessionEnd',
+      timestamp: 5000,
+      payload: {},
+      flags: { stopsSession: true },
+    })
+    allBroadcasts.length = 0
+    await postEvent({
+      agentClass: 'claude-code',
+      sessionId: 'sess-1',
+      agentId: 'sess-1',
+      hookName: 'UserPromptSubmit',
+      timestamp: 6000,
+      payload: {},
+    })
+    const session = await store.getSessionById('sess-1')
+    expect(session.stopped_at).toBeNull()
+    expect(
+      allBroadcasts.find((m) => m.type === 'session_update' && m.data.status === 'active'),
+    ).toBeTruthy()
+  })
+
+  test('late event older than stopped_at does NOT reactivate the session', async () => {
+    await seedSession('sess-1')
+    await postEvent({
+      agentClass: 'claude-code',
+      sessionId: 'sess-1',
+      agentId: 'sess-1',
+      hookName: 'SessionEnd',
+      timestamp: 5000,
+      payload: {},
+      flags: { stopsSession: true },
+    })
+    allBroadcasts.length = 0
+    await postEvent({
+      agentClass: 'claude-code',
+      sessionId: 'sess-1',
+      agentId: 'sess-1',
+      hookName: 'PostToolUse',
+      timestamp: 4000,
+      payload: {},
+    })
+    const session = await store.getSessionById('sess-1')
+    expect(session.stopped_at).toBe(5000)
+    expect(allBroadcasts.find((m) => m.type === 'session_update')).toBeUndefined()
+  })
+
+  test('event on a running session does NOT broadcast session_update', async () => {
+    await seedSession('sess-1')
+    allBroadcasts.length = 0
+    await postEvent({
+      agentClass: 'claude-code',
+      sessionId: 'sess-1',
+      agentId: 'sess-1',
+      hookName: 'PreToolUse',
+      timestamp: 6000,
+      payload: {},
+    })
+    expect(allBroadcasts.find((m) => m.type === 'session_update')).toBeUndefined()
+  })
+
   test('routine event does NOT clear an existing pending notification', async () => {
     await seedSession('sess-1')
     await postEvent({
