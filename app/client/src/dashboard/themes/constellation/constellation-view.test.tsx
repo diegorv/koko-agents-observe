@@ -258,4 +258,26 @@ describe('ConstellationView frame loop', () => {
     raf.mockRestore()
     now.mockRestore()
   })
+
+  it('pauses pulse/orbit animations on cold stars only', () => {
+    mockWindowed = {
+      data: [
+        session('cold', { lastActivity: Date.now() - 6 * 60 * 60 * 1000 }),
+        session('hot', { lastActivity: Date.now() }),
+      ],
+      isLoading: false,
+    }
+    const queue: FrameRequestCallback[] = []
+    const raf = vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((cb) => {
+      queue.push(cb)
+      return queue.length
+    })
+    const { container } = renderWithProviders(<ConstellationView {...props} />)
+    for (const cb of queue.splice(0)) cb(0)
+    raf.mockRestore()
+
+    const star = (slug: string) => inSvg(container).getByText(slug).closest('g.cst-star')!
+    expect(star('cold').classList.contains('cst-star--cold')).toBe(true)
+    expect(star('hot').classList.contains('cst-star--cold')).toBe(false)
+  })
 })

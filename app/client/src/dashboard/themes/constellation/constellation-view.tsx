@@ -48,6 +48,9 @@ const WELL_TAU_SEC = 4 * 60 * 60
 // refresh at this interval instead of every frame — heat decays over tens of
 // seconds, so 10 Hz is visually identical.
 const VISUAL_INTERVAL_MS = 100
+// At or below this heat a star's pulse is invisible; its pulse and orbit
+// animations are paused too (any running animation repaints the whole SVG).
+const COLD_HEAT = 0.06
 // Physics sleeps after this many consecutive frames under SETTLE_SPEED.
 const SETTLE_SPEED = 0.02
 const SETTLE_FRAMES = 30
@@ -508,13 +511,16 @@ export function ConstellationView({ onOpenSession }: DashboardThemeProps) {
               els.core.setAttribute('r', r.toFixed(2))
               els.core.setAttribute('fill', col)
               els.core.style.filter =
-                h > 0.06 ? `drop-shadow(0 0 ${(m.baseR * 0.7 * h).toFixed(1)}px ${col})` : 'none'
+                h > COLD_HEAT
+                  ? `drop-shadow(0 0 ${(m.baseR * 0.7 * h).toFixed(1)}px ${col})`
+                  : 'none'
             }
             if (els.glow) {
               els.glow.setAttribute('fill', col)
               els.glow.style.opacity = (0.5 * h).toFixed(3)
             }
-            if (els.pulseWrap) els.pulseWrap.style.opacity = Math.max(0, h - 0.06).toFixed(3)
+            if (els.pulseWrap) els.pulseWrap.style.opacity = Math.max(0, h - COLD_HEAT).toFixed(3)
+            els.g.classList.toggle('cst-star--cold', !s.attention && h <= COLD_HEAT)
             if (els.label) els.label.style.opacity = (0.28 + 0.55 * h).toFixed(3)
             d.h = h
             d.attn = s.attention

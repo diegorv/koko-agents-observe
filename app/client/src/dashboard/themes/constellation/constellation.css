@@ -218,6 +218,13 @@
   transform-origin: center;
   animation: cst-spin linear infinite;
 }
+/* Cold stars: the pulse is invisible and the orbit barely visible, but a
+   running animation inside an SVG repaints the whole SVG every frame.
+   Paused animations don't. Toggled by the frame loop (COLD_HEAT). */
+.cst-star--cold .cst-pulse,
+.cst-star--cold .cst-orbit {
+  animation-play-state: paused;
+}
 @keyframes cst-spin {
   to {
     transform: rotate(360deg);
