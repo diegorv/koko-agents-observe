@@ -14,7 +14,7 @@ import { ThemeSwitcher } from './theme-switcher'
  * the sort toggle.
  */
 export function DashboardHost() {
-  const { data: sessions, isLoading } = useRecentSessions(30)
+  const { data: sessions, isLoading } = useRecentSessions(100)
   const sessionSortOrder = useUIStore((s) => s.sessionSortOrder)
   const setSessionSortOrder = useUIStore((s) => s.setSessionSortOrder)
   const dashboardThemeId = useUIStore((s) => s.dashboardThemeId)

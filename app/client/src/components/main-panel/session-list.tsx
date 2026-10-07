@@ -1,4 +1,8 @@
+import { useId } from 'react'
 import { useUIStore } from '@/stores/ui-store'
+import { useNow } from '@/hooks/use-now'
+import { isSessionRunning, partitionByRunning } from '@/lib/session-status'
+import { StatusSectionHeader } from '@/components/shared/status-section-header'
 import { cn } from '@/lib/utils'
 import { Clock, Folder, Activity } from 'lucide-react'
 import {
@@ -36,6 +40,8 @@ export function SessionList({
   sortBy = 'activity',
 }: SessionListProps) {
   const openSession = useUIStore((s) => s.openSession)
+  const now = useNow()
+  const sectionId = useId()
 
   const handleSessionClick = (projectId: number | null, projectSlug: string, sessionId: string) => {
     // Open as a single history entry so browser Back returns to wherever the
@@ -53,12 +59,16 @@ export function SessionList({
     )
   }
 
-  return (
+  const { running, ended } = partitionByRunning(sessions, (s) => isSessionRunning(s, now))
+
+  const renderRows = (list: (Session | RecentSession)[], isRunning: boolean, dimmed = false) => (
     <div className="divide-y divide-border">
-      {sessions.map((session) => (
+      {list.map((session) => (
         <SessionRow
           key={session.id}
           session={session}
+          isRunning={isRunning}
+          dimmed={dimmed}
           showProject={showProject}
           sortBy={sortBy}
           onSelect={() =>
@@ -72,15 +82,48 @@ export function SessionList({
       ))}
     </div>
   )
+
+  // Nothing running: keep the plain list, no section headers.
+  if (running.length === 0) return renderRows(ended, false)
+
+  const headerClass = 'px-4 pt-3 pb-1.5 border-b border-border'
+  return (
+    <div>
+      <div role="group" aria-labelledby={`${sectionId}-running`}>
+        <StatusSectionHeader
+          id={`${sectionId}-running`}
+          status="running"
+          count={running.length}
+          className={headerClass}
+        />
+        {renderRows(running, true)}
+      </div>
+      {ended.length > 0 && (
+        <div role="group" aria-labelledby={`${sectionId}-ended`} className="border-t border-border">
+          <StatusSectionHeader
+            id={`${sectionId}-ended`}
+            status="ended"
+            count={ended.length}
+            className={cn(headerClass, 'mt-4')}
+          />
+          {renderRows(ended, false, true)}
+        </div>
+      )}
+    </div>
+  )
 }
 
 function SessionRow({
   session,
+  isRunning,
+  dimmed,
   showProject,
   sortBy,
   onSelect,
 }: {
   session: Session | RecentSession
+  isRunning: boolean
+  dimmed: boolean
   showProject: boolean
   sortBy: 'activity' | 'created'
   onSelect: () => void
@@ -134,13 +177,13 @@ function SessionRow({
           <span
             className={cn(
               'h-2 w-2 shrink-0 rounded-full',
-              session.status === 'active'
-                ? 'bg-green-500'
-                : 'bg-muted-foreground/60 dark:bg-muted-foreground/40',
+              isRunning ? 'bg-green-500' : 'bg-muted-foreground/60 dark:bg-muted-foreground/40',
             )}
           />
         )}
-        <span className="text-sm font-medium truncate">{label}</span>
+        <span className={cn('text-sm font-medium truncate', dimmed && 'text-muted-foreground')}>
+          {label}
+        </span>
         <div className="flex items-center gap-1.5 ml-auto shrink-0">
           {/* event count badge removed — counts are no longer
               denormalized on the session row. Re-add via
